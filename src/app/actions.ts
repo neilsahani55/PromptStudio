@@ -1,8 +1,8 @@
 "use server";
 
-// Vercel Hobby cap is 60s — screenshot + vision analysis needs more than the
-// default 10s. This applies to every server action exported from this file.
-export const maxDuration = 60;
+// Note: Vercel function timeout is set via `export const maxDuration = 60`
+// in src/app/layout.tsx — "use server" files can ONLY export async functions,
+// so we can't set it here directly.
 
 import { headers } from 'next/headers';
 import { generateImagePromptsFromText } from "@/ai/flows/generate-image-prompts-from-text";
