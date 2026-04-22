@@ -1,0 +1,362 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 40 75% 98%;
+    --foreground: 21 18% 25%;
+    --card: 36 47% 95%;
+    --card-foreground: 21 18% 25%;
+    --popover: 36 47% 95%;
+    --popover-foreground: 21 18% 25%;
+    --primary: 33 90% 37%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 34 64% 73%;
+    --secondary-foreground: 33 5% 32%;
+    --muted: 39 46% 90%;
+    --muted-foreground: 25 5% 45%;
+    --accent: 33 75% 84%;
+    --accent-foreground: 33 5% 32%;
+    --destructive: 0 70% 35%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 40 44% 82%;
+    --input: 40 44% 82%;
+    --ring: 33 90% 37%;
+    --chart-1: 33 90% 37%;
+    --chart-2: 25 5% 45%;
+    --chart-3: 38 92% 33%;
+    --chart-4: 25 5% 45%;
+    --chart-5: 42 96% 40%;
+    --radius: 0.3rem;
+  }
+  .dark {
+    --background: 24 10% 10%;
+    --foreground: 60 5% 96%;
+    --card: 12 5% 15%;
+    --card-foreground: 60 5% 96%;
+    --popover: 12 5% 15%;
+    --popover-foreground: 60 5% 96%;
+    --primary: 25 95% 53%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 33 5% 32%;
+    --secondary-foreground: 20 6% 90%;
+    --muted: 12 5% 15%;
+    --muted-foreground: 30 5% 64%;
+    --accent: 199 46% 22%;
+    --accent-foreground: 20 6% 90%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 30 7% 25%;
+    --input: 30 7% 25%;
+    --ring: 25 95% 53%;
+    --chart-1: 25 95% 53%;
+    --chart-2: 199 89% 48%;
+    --chart-3: 48 96% 47%;
+    --chart-4: 30 5% 64%;
+    --chart-5: 25 5% 45%;
+  }
+
+  /* ─── Ocean Blue (light-feel) ───────────────────────────── */
+  [data-theme="ocean-blue"] {
+    --background: 200 50% 97%;
+    --foreground: 210 40% 15%;
+    --card: 200 40% 95%;
+    --card-foreground: 210 40% 15%;
+    --popover: 200 40% 95%;
+    --popover-foreground: 210 40% 15%;
+    --primary: 205 85% 45%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 195 50% 85%;
+    --secondary-foreground: 210 40% 20%;
+    --muted: 200 30% 92%;
+    --muted-foreground: 210 15% 45%;
+    --accent: 180 70% 40%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 70% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 200 35% 85%;
+    --input: 200 35% 85%;
+    --ring: 205 85% 45%;
+    --chart-1: 205 85% 45%;
+    --chart-2: 180 70% 40%;
+    --chart-3: 220 80% 55%;
+    --chart-4: 160 60% 45%;
+    --chart-5: 250 70% 55%;
+  }
+
+  /* ─── Forest Green (dark-feel) ──────────────────────────── */
+  [data-theme="forest-green"] {
+    --background: 140 20% 10%;
+    --foreground: 130 20% 92%;
+    --card: 140 15% 13%;
+    --card-foreground: 130 20% 92%;
+    --popover: 140 15% 13%;
+    --popover-foreground: 130 20% 92%;
+    --primary: 140 55% 45%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 140 10% 25%;
+    --secondary-foreground: 130 20% 92%;
+    --muted: 140 10% 18%;
+    --muted-foreground: 130 10% 65%;
+    --accent: 40 70% 55%;
+    --accent-foreground: 140 20% 10%;
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 140 10% 22%;
+    --input: 140 10% 22%;
+    --ring: 140 55% 45%;
+    --chart-1: 140 55% 45%;
+    --chart-2: 40 70% 55%;
+    --chart-3: 160 50% 40%;
+    --chart-4: 80 50% 50%;
+    --chart-5: 20 70% 55%;
+  }
+
+  /* ─── Sunset (light-feel, warm) ─────────────────────────── */
+  [data-theme="sunset"] {
+    --background: 25 90% 97%;
+    --foreground: 20 40% 20%;
+    --card: 25 80% 95%;
+    --card-foreground: 20 40% 20%;
+    --popover: 25 80% 95%;
+    --popover-foreground: 20 40% 20%;
+    --primary: 15 85% 55%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 30 70% 80%;
+    --secondary-foreground: 20 40% 25%;
+    --muted: 25 60% 92%;
+    --muted-foreground: 20 20% 45%;
+    --accent: 340 75% 60%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 70% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 25 50% 85%;
+    --input: 25 50% 85%;
+    --ring: 15 85% 55%;
+    --chart-1: 15 85% 55%;
+    --chart-2: 340 75% 60%;
+    --chart-3: 35 80% 55%;
+    --chart-4: 280 70% 60%;
+    --chart-5: 50 85% 55%;
+  }
+
+  /* ─── Rose (light-feel, pink) ───────────────────────────── */
+  [data-theme="rose"] {
+    --background: 350 55% 98%;
+    --foreground: 350 30% 20%;
+    --card: 350 45% 96%;
+    --card-foreground: 350 30% 20%;
+    --popover: 350 45% 96%;
+    --popover-foreground: 350 30% 20%;
+    --primary: 345 75% 55%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 345 50% 85%;
+    --secondary-foreground: 350 30% 25%;
+    --muted: 350 30% 93%;
+    --muted-foreground: 350 15% 45%;
+    --accent: 330 70% 65%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 70% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 345 35% 88%;
+    --input: 345 35% 88%;
+    --ring: 345 75% 55%;
+    --chart-1: 345 75% 55%;
+    --chart-2: 330 70% 65%;
+    --chart-3: 15 75% 60%;
+    --chart-4: 280 65% 65%;
+    --chart-5: 240 60% 65%;
+  }
+
+  /* ─── Midnight (dark-feel, deep blue) ───────────────────── */
+  [data-theme="midnight"] {
+    --background: 220 40% 8%;
+    --foreground: 200 30% 95%;
+    --card: 220 35% 12%;
+    --card-foreground: 200 30% 95%;
+    --popover: 220 35% 12%;
+    --popover-foreground: 200 30% 95%;
+    --primary: 210 90% 60%;
+    --primary-foreground: 220 40% 8%;
+    --secondary: 220 20% 22%;
+    --secondary-foreground: 200 30% 95%;
+    --muted: 220 25% 15%;
+    --muted-foreground: 210 15% 65%;
+    --accent: 190 85% 55%;
+    --accent-foreground: 220 40% 8%;
+    --destructive: 0 65% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 25% 20%;
+    --input: 220 25% 20%;
+    --ring: 210 90% 60%;
+    --chart-1: 210 90% 60%;
+    --chart-2: 190 85% 55%;
+    --chart-3: 260 70% 65%;
+    --chart-4: 160 65% 55%;
+    --chart-5: 30 80% 60%;
+  }
+
+  /* ─── Lavender (light-feel, purple) ─────────────────────── */
+  [data-theme="lavender"] {
+    --background: 270 40% 98%;
+    --foreground: 270 30% 20%;
+    --card: 270 30% 96%;
+    --card-foreground: 270 30% 20%;
+    --popover: 270 30% 96%;
+    --popover-foreground: 270 30% 20%;
+    --primary: 270 65% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 270 30% 88%;
+    --secondary-foreground: 270 30% 25%;
+    --muted: 270 25% 93%;
+    --muted-foreground: 270 15% 45%;
+    --accent: 330 70% 70%;
+    --accent-foreground: 270 30% 20%;
+    --destructive: 0 70% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 270 20% 88%;
+    --input: 270 20% 88%;
+    --ring: 270 65% 60%;
+    --chart-1: 270 65% 60%;
+    --chart-2: 330 70% 70%;
+    --chart-3: 220 65% 65%;
+    --chart-4: 180 55% 55%;
+    --chart-5: 30 75% 60%;
+  }
+
+  /* ─── Charcoal (dark-feel, neutral) ─────────────────────── */
+  [data-theme="charcoal"] {
+    --background: 0 0% 9%;
+    --foreground: 0 0% 92%;
+    --card: 0 0% 13%;
+    --card-foreground: 0 0% 92%;
+    --popover: 0 0% 13%;
+    --popover-foreground: 0 0% 92%;
+    --primary: 0 0% 85%;
+    --primary-foreground: 0 0% 9%;
+    --secondary: 0 0% 22%;
+    --secondary-foreground: 0 0% 92%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 65%;
+    --accent: 0 0% 30%;
+    --accent-foreground: 0 0% 95%;
+    --destructive: 0 65% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 22%;
+    --input: 0 0% 22%;
+    --ring: 0 0% 85%;
+    --chart-1: 0 0% 85%;
+    --chart-2: 0 0% 65%;
+    --chart-3: 0 0% 45%;
+    --chart-4: 210 50% 60%;
+    --chart-5: 30 70% 60%;
+  }
+
+  /* ─── Emerald (light-feel, vibrant green) ───────────────── */
+  [data-theme="emerald"] {
+    --background: 150 50% 97%;
+    --foreground: 160 40% 15%;
+    --card: 150 40% 95%;
+    --card-foreground: 160 40% 15%;
+    --popover: 150 40% 95%;
+    --popover-foreground: 160 40% 15%;
+    --primary: 160 75% 38%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 150 40% 85%;
+    --secondary-foreground: 160 40% 20%;
+    --muted: 150 30% 92%;
+    --muted-foreground: 160 15% 45%;
+    --accent: 180 65% 45%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 70% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 150 30% 85%;
+    --input: 150 30% 85%;
+    --ring: 160 75% 38%;
+    --chart-1: 160 75% 38%;
+    --chart-2: 180 65% 45%;
+    --chart-3: 130 60% 45%;
+    --chart-4: 200 70% 50%;
+    --chart-5: 45 80% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r;
+  }
+  .glass {
+    @apply bg-background/80 backdrop-blur-xl;
+  }
+}
+
+/* Subtle dot grid for hero area */
+.bg-dot-grid {
+  background-image: radial-gradient(circle, hsl(var(--border) / 0.5) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Pulse glow for loading spinner */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 20px hsl(var(--primary) / 0.15); }
+  50% { box-shadow: 0 0 40px hsl(var(--primary) / 0.3); }
+}
+.pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Card hover lift */
+.card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px hsl(var(--primary) / 0.08);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* Selection color */
+::selection {
+  background: hsl(var(--primary) / 0.15);
+  color: hsl(var(--foreground));
+}
+
+/* Focus visible */
+:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+  border-radius: var(--radius);
+}
+
+/* Smooth transitions on theme change */
+body {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
