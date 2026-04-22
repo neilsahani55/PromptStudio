@@ -208,6 +208,28 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Detect content-filtered responses. NVIDIA Flux returns a solid-black
+    // image (HTTP 200, no error) when its safety filter rejects a prompt.
+    // Real photographs are 50-200 KB; filtered black images are < 15 KB
+    // because solid colour compresses to nearly nothing in JPEG.
+    if (base64) {
+      const rawB64 = base64.replace(/^data:[^,]+,/, '');
+      const byteLen = Math.floor((rawB64.length * 3) / 4);
+      if (byteLen < 15_000) {
+        return NextResponse.json(
+          {
+            error: 'Image generation blocked by content filter.',
+            detail:
+              "The model returned an empty/black image, which NVIDIA's safety filter does when a prompt is rejected.",
+            hint:
+              'Try rephrasing: remove brand names, named people, "photorealistic portrait" phrasing, or anything that could trip a content check. Generic scenes and objects usually pass.',
+            upstreamStatus: res.status,
+          },
+          { status: 502 }
+        );
+      }
+    }
+
     // Ensure base64 has the correct data URI prefix
     if (base64 && !base64.startsWith('data:image/')) {
       // Detect simple magic numbers for JPEG vs PNG
