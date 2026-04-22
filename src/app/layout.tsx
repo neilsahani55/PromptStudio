@@ -4,6 +4,10 @@ import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/components/auth-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 
+// Raise the serverless function timeout for all routes under this layout so
+// vision-heavy flows (screenshot analysis) don't get killed at 10 s.
+export const maxDuration = 60;
+
 export const metadata: Metadata = {
   title: 'PromptStudio',
   description: 'Turn blog posts, screenshots, or any image into engaging, social-media-ready visuals with the power of AI.',

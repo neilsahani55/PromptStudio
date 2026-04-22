@@ -1,5 +1,9 @@
 "use server";
 
+// Vercel Hobby cap is 60s — screenshot + vision analysis needs more than the
+// default 10s. This applies to every server action exported from this file.
+export const maxDuration = 60;
+
 import { headers } from 'next/headers';
 import { generateImagePromptsFromText } from "@/ai/flows/generate-image-prompts-from-text";
 import { generateImagePromptsFromScreenshot } from "@/ai/flows/generate-image-prompts-from-screenshot";
