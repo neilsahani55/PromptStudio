@@ -270,49 +270,57 @@ export async function getAnalysisFromImage(
     colorThemeMode: colorThemeMode as any,
     presetColorThemeId: presetColorThemeId as any,
     customColorDescription,
-    customColorTheme
+    customColorTheme,
   };
 
-  // Try with selected model first, then fallback chain
-  const modelsToTry = [model, ...FALLBACK_CHAIN.filter(m => m !== model)];
-  let lastError: unknown = null;
-  let usedModel = model || 'googleai/gemini-2.5-flash';
+  // Screenshot flow is vision-heavy and can brush against Vercel Hobby's 60s
+  // limit. Give it one try, one model, with a hard 50s deadline so we return
+  // a clean error before Vercel kills the function. No retries, no fallback
+  // chain — those only add wasted time on already-slow requests.
+  const usedModel = model || 'googleai/gemini-2.5-flash';
+  const DEADLINE_MS = 50_000;
 
-  for (const currentModel of modelsToTry) {
-    try {
-      const result = await withRetry(() => generateImagePromptsFromScreenshot({
-        ...inputParams,
-        model: currentModel,
-      }));
+  try {
+    const result = await Promise.race([
+      generateImagePromptsFromScreenshot({ ...inputParams, model: usedModel }),
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error('DEADLINE_EXCEEDED')),
+          DEADLINE_MS
+        )
+      ),
+    ]);
 
-      usedModel = currentModel || 'googleai/gemini-2.5-flash';
-      const elapsed = Date.now() - startTime;
+    const elapsed = Date.now() - startTime;
+    logUsage(usedModel, 'screenshot', elapsed);
 
-      // Log usage for analytics
-      logUsage(usedModel, 'screenshot', elapsed);
+    return {
+      success: true,
+      data: result,
+      meta: {
+        model: usedModel,
+        elapsed,
+        fallback: false,
+        remaining: rateCheck.remaining,
+      },
+    };
+  } catch (e) {
+    const errMsg = e instanceof Error ? e.message : String(e);
+    console.error('Screenshot flow failed:', errMsg.slice(0, 200));
 
+    if (errMsg === 'DEADLINE_EXCEEDED') {
       return {
-        success: true,
-        data: result,
-        meta: {
-          model: usedModel,
-          elapsed,
-          fallback: currentModel !== model,
-          remaining: rateCheck.remaining,
-        }
+        success: false,
+        error:
+          'Screenshot analysis took too long (>50s). Try a simpler screenshot, ' +
+          'a smaller image, or the text input tab instead.',
+        errorType: 'timeout',
       };
-    } catch (e) {
-      lastError = e;
-      const errMsg = e instanceof Error ? e.message : String(e);
-      console.warn(`Screenshot model ${currentModel || 'default'} failed: ${errMsg.slice(0, 80)}. Trying next...`);
-      continue;
     }
-  }
 
-  // All models failed
-  console.error("All screenshot models failed:", lastError);
-  const { message, type } = categorizeError(lastError);
-  return { success: false, error: message, errorType: type };
+    const { message, type } = categorizeError(e);
+    return { success: false, error: message, errorType: type };
+  }
 }
 
 export async function submitFeedback(entry: Omit<FeedbackEntry, 'timestamp'>): Promise<ActionResponse<void>> {
