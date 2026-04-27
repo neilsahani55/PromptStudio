@@ -234,8 +234,10 @@ Output strict JSON matching the schema.
 Content: ${input.blogText.slice(0, 1500)}
 `;
 
-    const useRelaxedSchema = isNvidiaModel(input.model);
-    const componentsSchema = useRelaxedSchema ? RelaxedPromptComponentsSchema : PromptComponentsSchema;
+    // Always use the relaxed schema — the strict one has minLength + refine validators
+    // that cause Genkit to silently retry the full AI call on every validation failure,
+    // which can double/triple generation time unpredictably.
+    const componentsSchema = RelaxedPromptComponentsSchema;
 
     console.log("MODEL_DEBUG", { model: input.model || 'default (gemini)', useRelaxedSchema });
 

@@ -71,8 +71,8 @@ const FALLBACK_CHAIN = AVAILABLE_MODELS
   .filter(m => m.id === 'googleai/gemini-2.5-flash' || m.id === 'openai/deepseek-ai/deepseek-v3.2')
   .map(m => m.id);
 
-const MAX_RETRIES = 1;
-const INITIAL_RETRY_DELAY_MS = 1500;
+const MAX_RETRIES = 0;
+const INITIAL_RETRY_DELAY_MS = 0;
 
 async function withRetry<T>(fn: () => Promise<T>, retries = MAX_RETRIES, attempt = 1): Promise<T> {
   try {
@@ -176,7 +176,7 @@ export async function getPromptsFromText(
   };
 
   // Hard deadline: return a clean error before Vercel's 60s limit kills the function
-  const DEADLINE_MS = 52_000;
+  const DEADLINE_MS = 58_000;
   const deadline = new Promise<never>((_, reject) =>
     setTimeout(() => reject(new Error('DEADLINE_EXCEEDED')), DEADLINE_MS)
   );
