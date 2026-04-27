@@ -71,8 +71,8 @@ const FALLBACK_CHAIN = AVAILABLE_MODELS
   .filter(m => m.id === 'googleai/gemini-2.5-flash' || m.id === 'openai/deepseek-ai/deepseek-v3.2')
   .map(m => m.id);
 
-const MAX_RETRIES = 3;
-const INITIAL_RETRY_DELAY_MS = 2000;
+const MAX_RETRIES = 1;
+const INITIAL_RETRY_DELAY_MS = 1500;
 
 async function withRetry<T>(fn: () => Promise<T>, retries = MAX_RETRIES, attempt = 1): Promise<T> {
   try {
@@ -175,50 +175,73 @@ export async function getPromptsFromText(
     customColorTheme
   };
 
+  // Hard deadline: return a clean error before Vercel's 60s limit kills the function
+  const DEADLINE_MS = 52_000;
+  const deadline = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error('DEADLINE_EXCEEDED')), DEADLINE_MS)
+  );
+
   // Try with selected model first, then fallback chain
   const modelsToTry = [model, ...FALLBACK_CHAIN.filter(m => m !== model)];
   let lastError: unknown = null;
   let usedModel = model || 'googleai/gemini-2.5-flash';
 
-  for (const currentModel of modelsToTry) {
-    try {
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`Trying model: ${currentModel || 'default'}`);
-      }
+  try {
+    const result = await Promise.race([
+      (async () => {
+        for (const currentModel of modelsToTry) {
+          try {
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`Trying model: ${currentModel || 'default'}`);
+            }
 
-      const result = await withRetry(() => generateImagePromptsFromText({
-        ...inputParams,
-        model: currentModel,
-      }));
+            const res = await withRetry(() => generateImagePromptsFromText({
+              ...inputParams,
+              model: currentModel,
+            }));
 
-      usedModel = currentModel || 'googleai/gemini-2.5-flash';
-      const elapsed = Date.now() - startTime;
-
-      // Log usage for analytics
-      logUsage(usedModel, 'text', elapsed);
-
-      return {
-        success: true,
-        data: result,
-        meta: {
-          model: usedModel,
-          elapsed,
-          fallback: currentModel !== model,
-          remaining: rateCheck.remaining,
+            usedModel = currentModel || 'googleai/gemini-2.5-flash';
+            return { res, usedModel, fallback: currentModel !== model };
+          } catch (e) {
+            lastError = e;
+            const errMsg = e instanceof Error ? e.message : String(e);
+            console.warn(`Model ${currentModel || 'default'} failed: ${errMsg.slice(0, 80)}. Trying next...`);
+          }
         }
-      };
-    } catch (e) {
-      lastError = e;
-      const errMsg = e instanceof Error ? e.message : String(e);
-      console.warn(`Model ${currentModel || 'default'} failed: ${errMsg.slice(0, 80)}. Trying next...`);
-      continue;
-    }
-  }
+        // All models failed
+        throw lastError ?? new Error('All models failed');
+      })(),
+      deadline,
+    ]);
 
-  // All models failed
-  console.error("All models failed:", lastError);
-  const { message, type } = categorizeError(lastError);
-  return { success: false, error: message, errorType: type };
+    const elapsed = Date.now() - startTime;
+    logUsage(result.usedModel, 'text', elapsed);
+
+    return {
+      success: true,
+      data: result.res,
+      meta: {
+        model: result.usedModel,
+        elapsed,
+        fallback: result.fallback,
+        remaining: rateCheck.remaining,
+      }
+    };
+  } catch (e) {
+    const errMsg = e instanceof Error ? e.message : String(e);
+    console.error('Text generation failed:', errMsg.slice(0, 200));
+
+    if (errMsg === 'DEADLINE_EXCEEDED') {
+      return {
+        success: false,
+        error: 'Generation took too long (>52s). Try shorter input, a simpler image type, or try again in a moment.',
+        errorType: 'timeout',
+      };
+    }
+
+    const { message, type } = categorizeError(e);
+    return { success: false, error: message, errorType: type };
+  }
 }
 
 export async function getAnalysisFromImage(
