@@ -153,32 +153,47 @@ function getModelConfig(modelName?: string, defaultTemp = 0.7) {
     return {
       temperature: 0.6,
       topP: 0.9,
-      maxOutputTokens: 4096,
+      maxOutputTokens: 2500,
     };
   }
   if (modelName && modelName.includes('deepseek-v3.2')) {
     return {
-      temperature: 1,
+      temperature: 0.8,
       topP: 0.95,
-      maxOutputTokens: 8192,
-      extra_body: { chat_template_kwargs: { thinking: true } }
+      maxOutputTokens: 2500,
+      // thinking: true removed — it adds 30-50s of reasoning time on Vercel Hobby
     };
   }
   if (modelName && modelName.includes('gpt-oss-120b')) {
     return {
       temperature: 0.8,
       topP: 1.0,
-      maxOutputTokens: 4096,
+      maxOutputTokens: 2500,
     };
   }
   if (modelName && (modelName.includes('qwen3') || modelName.includes('glm4'))) {
     return {
       temperature: 0.7,
       topP: 0.9,
-      maxOutputTokens: 4096,
+      maxOutputTokens: 2500,
     };
   }
-  return { temperature: defaultTemp };
+  // Default (Gemini 2.5 Flash and others) — cap tokens to prevent unbounded generation
+  return { temperature: defaultTemp, maxOutputTokens: 2500 };
+}
+
+function getImageTypeRule(imageType?: string): string {
+  const rules: Record<string, string> = {
+    infographic: 'Icon-driven, no photorealistic humans. Max 6 short labels from the content, 1 title, clean modular layout.',
+    character: 'Full character focus, simple background, no data/charts.',
+    abstract_visual: 'Metaphor/geometry that clearly relates to the content topic.',
+    ui_mockup: 'Clean functional UI, no design tool chrome.',
+    scene_illustration: 'Narrative moment that illustrates the article subject.',
+    product_render: 'Studio-quality, material accuracy, commercial look.',
+    data_viz: 'Clean charts, Tufte-style, precise geometry.',
+    icon_or_sticker: 'Bold, simple icon on clean background.',
+  };
+  return rules[imageType || ''] || 'Scene illustration: show the article subject in a narrative moment.';
 }
 
 export async function runGenerateImagePromptsFromTextLogic(input: GenerateImagePromptsFromTextInput): Promise<GenerateImagePromptsFromTextOutput> {
@@ -187,76 +202,36 @@ export async function runGenerateImagePromptsFromTextLogic(input: GenerateImageP
     const freshnessHint = buildFreshnessHint(freshness);
 
     // Step 1: Session prompting with AI model
-    const promptText = `You are a senior creative director who creates image concepts for blog articles. Your #1 priority is **content accuracy** — the image must clearly represent what the article is about.
+    const promptText = `You are a senior creative director creating image concepts for blog articles. Priority #1: content accuracy — the image must instantly communicate what the article is about.
 
-**STEP 0 — UNDERSTAND THE CONTENT (Critical — do this first)**
-Before ANY visual ideation, answer these questions internally:
-1. What is this article actually about? (e.g., “How to make international phone calls from US to UK”)
-2. Who is the target audience? (e.g., “people who need to call UK numbers”)
-3. What are the 3-5 key takeaways? (e.g., “dialing instructions, area codes, time zones, cost tips, VoIP services”)
-4. What objects/concepts would a reader immediately associate with this topic? (e.g., “phones, flags, dial pads, world map, clock showing time zones”)
+**UNDERSTAND THE CONTENT FIRST**
+Before any visual ideation, identify: (1) what this article is actually about, (2) the target audience, (3) 3-5 key concepts a reader would associate with the topic.
 
-Your image MUST be instantly recognizable as being about this specific topic. If someone sees the image, they should immediately understand the article's subject.
+**VISUAL ANCHOR** — write a “visual_anchor”: 1–2 sentences describing ONE concrete, drawable scene that directly represents the article topic using recognizable objects/symbols. Be specific enough for any artist to recreate.
+Good: “A split-screen showing a US phone dialing +44 connected by a glowing arc to a UK phone, with labeled steps floating alongside: country code, area code, local number”
+Bad: “Abstract origami structures evoking geopolitical alliance” (too abstract, nobody knows it's about phone calls)
 
-**STEP 1 — VISUAL ANCHOR**
-Write a “visual_anchor”: 1–2 sentences describing ONE concrete scene that:
-- DIRECTLY represents the article's actual subject matter
-- Uses objects and symbols the target audience would recognize
-- Is specific enough for any artist to recreate
+**10-PART COMPONENT SPEC** — using the visual anchor, fill each field with specific, concrete, content-relevant details:
+- subject: main visual elements (exact objects, materials, colors) recognizable as related to the article
+- action_context: what is happening that communicates the article's message
+- environment: setting that reinforces the topic (tech guide = clean modern; cooking = kitchen)
+- mood_story: emotional tone matching the article (helpful guide = clear and empowering)
+- visual_style: art style appropriate for content and audience
+- lighting_color: light source, direction, color palette supporting readability
+- camera_composition: framing that showcases key information clearly
+- detail_texture: relevant surface details and materials
+- quality_realism: technical quality specs (8K, clean render, etc.)
+- negative_constraints: elements to avoid, especially anything that would confuse the topic
 
-CONTENT-FIRST examples:
-- Article about “How to Call UK from US”: “A clean split-screen showing a US smartphone on the left dialing +44, connected by a glowing line across a minimal world map to a UK phone on the right, with labeled steps floating alongside: country code, area code, local number”
-- Article about “Best Coffee Brewing Methods”: “A top-down flat-lay of four distinct brewing setups — French press, pour-over, espresso machine, and AeroPress — each with its coffee cup showing different crema colors, arranged on a warm wooden counter with labeled brew times”
-- BAD (for calling guide): “Two monumental origami structures evoking geopolitical alliance” ← This is completely disconnected from the content. Nobody would know this is about phone calls.
+**IMAGE TYPE** (${input.imageType || 'scene_illustration'}): ${getImageTypeRule(input.imageType)}
 
-Also create 2-3 “alt_anchors” with genuinely DIFFERENT visual approaches that still clearly represent the same content topic.
-
-**STEP 2 — 10-PART COMPONENT SPEC**
-Using your visual_anchor, fill every component with SPECIFIC, CONCRETE details:
-- subject: The main visual elements that represent the article topic. Name exact objects, materials, colors. Must be recognizable as related to the content.
-- action_context: What is happening that communicates the article's message? Show the process/concept in action.
-- environment: Setting that reinforces the topic. If it's a tech guide, use a clean modern setting. If it's cooking, use a kitchen. Match the content.
-- mood_story: The emotional tone matching the article. A helpful guide should feel clear and empowering, not ominous.
-- visual_style: Art style appropriate for the content and audience. A business article needs professional polish, a creative article can be more experimental.
-- lighting_color: Light source, direction, color palette that supports readability and mood.
-- camera_composition: Framing that showcases the key information clearly. Prioritize clarity over artistic angles.
-- detail_texture: Surface details and materials. Keep them relevant to the subject matter.
-- quality_realism: Technical quality specs (8K, clean render, etc.).
-- negative_constraints: What to explicitly avoid — including anything that would confuse the topic.
-
-**STEP 3 — IMAGE TYPE RULES**
-Respect the imageType strictly:
-- infographic: Icon-driven, no photorealistic humans. Labels MUST come from the actual content (e.g., article key points, steps, or data). Max 6 short labels derived from the article, 1 title matching the article topic, 1 CTA. Clean modular layout with generous whitespace, icon-based communication.
-- character: Full character focus, simple background, no data/charts
-- abstract_visual: Use metaphor/geometry, but the metaphor must clearly relate to the content topic
-- ui_mockup: Clean functional UI, no design tool chrome
-- scene_illustration: Narrative moment that illustrates the article's subject
-- product_render: Studio-quality, material accuracy, commercial look
-- data_viz: Clean charts, Tufte-style, precise geometry, data from the article
-
-**CONTENT ACCURACY RULES (Critical — Higher Priority Than Creativity)**
-1. The image title/headline MUST reflect the actual article topic, not an abstracted version
-2. Any labels or text in the image MUST use terms from the actual content
-3. Visual metaphors must be IMMEDIATELY understandable — if you need to explain the metaphor, it's too abstract
-4. The image should work as a thumbnail — a viewer should know what the article is about just from the image
-5. When in doubt, choose clarity over creativity
-
-**ANTI-STOCK RULES**
-Avoid generic stock imagery:
-- Disembodied hands reaching for things
-- Generic people smiling at laptops
-- Cheesy metaphors (lightbulb = idea, puzzle = teamwork)
-- Overused gradients with no subject
-But DO use relevant, recognizable objects and symbols for the topic.
+**RULES**: Labels/text must use terms from the actual content. Visual metaphors must be immediately understandable. Avoid: disembodied hands, generic laptop smiles, lightbulb=idea clichés.
 
 ${freshnessHint}
 
-**OUTPUT**: Strictly valid JSON matching the schema. Every string field must be specific, visual, AND relevant to the input content.
+Output strict JSON matching the schema.
 
-Input Content:
-${input.blogText}
-
-Image Type: ${input.imageType || 'scene_illustration'}
+Content: ${input.blogText.slice(0, 1500)}
 `;
 
     const useRelaxedSchema = isNvidiaModel(input.model);
@@ -266,32 +241,18 @@ Image Type: ${input.imageType || 'scene_illustration'}
 
     const outputSchema = z.object({
       unifiedAnalysis: z.object({
-        userText: z.string().optional(),
-        ocrText: z.string().optional(),
-        combinedText: z.string(),
         contentSummary: z.string(),
         keyPoints: z.array(z.string()),
         tone: z.string(),
         intent: z.string(),
-        audience: z.string(),
         visualSummary: z.string(),
         layoutDescription: z.string(),
-        uiElements: z.array(z.string()),
-        keepStructure: z.boolean(),
-        verdict: z.enum(['perfect', 'needs_edit']),
-        alignmentNotes: z.string(),
-        visualGoals: z.string(),
         brandStyle: z.string(),
         aspectRatioSuggestion: z.string(),
-        visual_anchor: z.string().optional().describe('1-2 sentences that describe a single concrete scene you could draw.'),
-        alt_anchors: z.array(z.object({
-            anchor: z.string(),
-            type: z.string()
-        })).optional().describe('2-3 alternative visual ideas (scene, character, infographic, abstract) tagged by imageType.'),
+        visual_anchor: z.string().describe('1-2 sentences: a single concrete scene to draw.'),
       }),
       promptComponents: componentsSchema,
       aspectRatioSuggestions: z.array(z.string()),
-      sanity_preview: z.string().optional()
     });
 
     const { output } = await ai.generate({
