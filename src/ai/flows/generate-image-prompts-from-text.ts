@@ -239,7 +239,7 @@ Content: ${input.blogText.slice(0, 1500)}
     // which can double/triple generation time unpredictably.
     const componentsSchema = RelaxedPromptComponentsSchema;
 
-    console.log("MODEL_DEBUG", { model: input.model || 'default (gemini)', useRelaxedSchema });
+    console.log("MODEL_DEBUG", { model: input.model || 'default (gemini)' });
 
     const outputSchema = z.object({
       unifiedAnalysis: z.object({
@@ -285,7 +285,7 @@ Content: ${input.blogText.slice(0, 1500)}
 
     // Auto-Theme Logic: If mode is auto/undefined, analyze content to pick a theme
     if (!userOptions.colorThemeMode || userOptions.colorThemeMode === 'auto') {
-        const autoTheme = analyzeAndSelectTheme(output.unifiedAnalysis);
+        const autoTheme = analyzeAndSelectTheme(output.unifiedAnalysis as unknown as UnifiedAnalysis);
         userOptions.colorThemeMode = 'custom';
         userOptions.customColorTheme = autoTheme;
         userOptions.customColorDescription = `Auto-generated theme: ${autoTheme.label}`;
