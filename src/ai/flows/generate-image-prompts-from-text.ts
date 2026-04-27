@@ -16,8 +16,7 @@ import { LengthMode } from '@/ai/prompt-schema';
 import { UnifiedContext } from '@/ai/prompt-schema';
 import { buildMasterPrompt, applyColorThemeToComponents } from '@/ai/utils/master-prompt';
 import { applyImageTypeBlueprint } from '@/ai/utils/image-type-blueprints';
-import { detectAndResolveConflicts } from '@/ai/utils/conflict-resolver';
-import { generateSanityPreview } from '@/ai/utils/sanity-preview';
+import { resolveStyleConflicts } from '@/ai/utils/conflict-resolver';
 import { analyzeAndSelectTheme } from '@/ai/utils/smart-theme-engine';
 import { generateFreshnessProfile, buildFreshnessHint } from '@/ai/utils/freshness-engine';
 import { textPromptCache, PromptCache } from '@/ai/utils/prompt-cache';
@@ -307,8 +306,8 @@ Image Type: ${input.imageType || 'scene_illustration'}
 
     if (!output) throw new Error("Model returned null — failed to generate prompt components");
 
-    // Conflict Resolution
-    output.promptComponents = await detectAndResolveConflicts(output.promptComponents);
+    // Conflict Resolution (sync — no extra AI call)
+    output.promptComponents = resolveStyleConflicts(output.promptComponents);
 
     // Step 2: Extract context from text analysis
     const userOptions: UserPromptOptions = {
@@ -352,50 +351,8 @@ Image Type: ${input.imageType || 'scene_illustration'}
     // Step 3: Generate enhanced prompts with quality scoring
     const enhancedOutput = generateEnhancedPrompts(output.promptComponents, generationContext);
 
-    // Override master prompt with the new robust builder
-    let masterPrompt = enhancedOutput.masterPrompt;
-
-    // Sanity Preview & Auto-Correction
-    let sanityPreview = await generateSanityPreview(masterPrompt, input.blogText);
-    let wasAutoCorrected = false;
-
-    const needsCorrection = sanityPreview && (
-        sanityPreview.includes('STOCK-LIKE') || sanityPreview.includes('CONTENT-MISMATCH')
-    );
-
-    if (needsCorrection) {
-        const isContentMismatch = sanityPreview!.includes('CONTENT-MISMATCH');
-
-        if (isContentMismatch) {
-            // Content mismatch: Re-ground the subject in the actual content topic
-            const contentSummary = output.unifiedAnalysis.contentSummary || '';
-            const keyPoints = output.unifiedAnalysis.keyPoints?.slice(0, 3).join(', ') || '';
-            output.promptComponents.subject = `clear visual representation of: ${contentSummary}. Key elements: ${keyPoints}`;
-            output.promptComponents.mood_story = `informative, clear, and directly relevant to the topic of ${contentSummary}`;
-            output.promptComponents.negative_constraints = (output.promptComponents.negative_constraints || "") + ", abstract metaphors unrelated to the topic, confusing symbolism, architectural structures used as metaphor, anything that obscures the actual subject";
-            sanityPreview += " [AUTO-CORRECTED: Re-grounded subject to match article content]";
-        } else {
-            // Stock-like: Enhance visual quality while keeping subject
-            const originalSubject = output.promptComponents.subject || '';
-            output.promptComponents.subject = `high-end 3D render representing ${originalSubject}, with clean modern iconography and premium visual treatment`;
-            output.promptComponents.environment = output.promptComponents.environment
-                ? `${output.promptComponents.environment}, modern premium aesthetic`
-                : "modern SaaS UI interface with clean lines and polished background";
-            output.promptComponents.negative_constraints = (output.promptComponents.negative_constraints || "") + ", human hands, stock photo, cheesy holograms, disembodied body parts, generic clipart";
-            sanityPreview += " [AUTO-CORRECTED: Enhanced subject with premium visual treatment]";
-        }
-
-        // Rebuild prompt
-        const correctedOutput = generateEnhancedPrompts(output.promptComponents, generationContext);
-        masterPrompt = correctedOutput.masterPrompt;
-
-        enhancedOutput.midjourney.prompt = correctedOutput.midjourney.prompt;
-        enhancedOutput.dalle.prompt = correctedOutput.dalle.prompt;
-        enhancedOutput.stableDiffusion.prompt = correctedOutput.stableDiffusion.prompt;
-        enhancedOutput.flux.prompt = correctedOutput.flux.prompt;
-
-        wasAutoCorrected = true;
-    }
+    const masterPrompt = enhancedOutput.masterPrompt;
+    const sanityPreview = "Skipped (Vercel timeout budget)";
 
     // Map to output format
     const detailedPrompts = {
