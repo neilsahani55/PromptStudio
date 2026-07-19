@@ -390,6 +390,42 @@ export async function enhanceInputText(
   }
 }
 
+/**
+ * Adapts an image master prompt into a video generation prompt: adds motion,
+ * camera movement, and temporal language that text-to-video models need.
+ */
+export async function getVideoMasterPrompt(imagePrompt: string): Promise<ActionResponse<string>> {
+  const trimmed = (imagePrompt || '').trim();
+  if (trimmed.length < 10) {
+    return { success: false, error: 'Generate an image prompt first.' };
+  }
+
+  const instruction =
+    `You are a film director writing prompts for AI text-to-video models. ` +
+    `Rewrite the following image prompt as a VIDEO prompt: keep the subject, setting, ` +
+    `and style, but add natural motion (what moves and how), one clear camera movement ` +
+    `(e.g. slow push-in, orbit, tracking shot), and temporal flow. 2-4 sentences of ` +
+    `flowing prose, max 900 characters. No lists, no preamble, no quotes.\n\n` +
+    `Image prompt: ${trimmed.slice(0, 2000)}\n\nVideo prompt:`;
+
+  const deadline = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error('DEADLINE_EXCEEDED')), 25_000)
+  );
+
+  try {
+    const res = await Promise.race([
+      ai.generate({ model: 'googleai/gemini-2.5-flash', prompt: instruction }),
+      deadline,
+    ]);
+    const out = (res.text || '').trim().replace(/^["']|["']$/g, '');
+    if (!out) return { success: false, error: 'The model returned an empty result.' };
+    return { success: true, data: out };
+  } catch (e) {
+    const { message, type } = categorizeError(e);
+    return { success: false, error: message, errorType: type };
+  }
+}
+
 export async function submitFeedback(entry: Omit<FeedbackEntry, 'timestamp'>): Promise<ActionResponse<void>> {
   try {
     await logFeedback({

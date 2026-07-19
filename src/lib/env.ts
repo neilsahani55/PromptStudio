@@ -28,6 +28,9 @@ export const ENV_SPECS: EnvSpec[] = [
   { key: 'NVIDIA_FLUX_URL', requirement: 'optional', purpose: 'Flux image endpoint override' },
   { key: 'NVIDIA_SD_URL', requirement: 'optional', purpose: 'Stable Diffusion image endpoint override' },
   { key: 'NVIDIA_QWEN_URL', requirement: 'optional', purpose: 'Qwen-Image endpoint override' },
+  { key: 'CLOUDFLARE_ACCOUNT_ID', requirement: 'optional', purpose: 'Cloudflare Workers AI image models (free tier)' },
+  { key: 'CLOUDFLARE_API_TOKEN', requirement: 'optional', purpose: 'Cloudflare Workers AI token (Workers AI permission)' },
+  { key: 'HF_TOKEN', requirement: 'optional', purpose: 'Hugging Face router — extra image models + video (beta)' },
   { key: 'ALLOWED_DEV_ORIGINS', requirement: 'optional', purpose: 'LAN origins for the dev server' },
 ];
 

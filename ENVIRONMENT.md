@@ -23,6 +23,10 @@ if something isn't working.
 | `NVIDIA_FLUX_URL` | Optional | Override Flux image endpoint | — |
 | `NVIDIA_SD_URL` | Optional | Override SD image endpoint | — |
 | `ALLOWED_DEV_ORIGINS` | Optional | LAN origins for the dev server | — |
+| `CLOUDFLARE_ACCOUNT_ID` | Optional | +4 free image models via Workers AI (~10k neurons/day free) | https://dash.cloudflare.com (right sidebar) |
+| `CLOUDFLARE_API_TOKEN` | Optional | Token with the "Workers AI" permission | Cloudflare → My Profile → API Tokens → "Workers AI" template |
+| `HF_TOKEN` | Optional | +2 image models and **video generation (beta)** via the HF router; small free monthly credits | https://huggingface.co/settings/tokens |
+| `BLOB_READ_WRITE_TOKEN` | Optional | Cross-device image gallery (Vercel Blob) | Vercel → Storage → Blob → Connect project |
 
 **Minimum to run:** `AUTH_SECRET` + `GOOGLE_GENAI_API_KEY`. Everything else is
 opt-in. With the Turso vars blank, the app uses a local SQLite file.

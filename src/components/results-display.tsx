@@ -15,6 +15,7 @@ import { submitFeedback } from "@/app/actions";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { QuickFixChips, FixType } from "@/components/quick-fix-chips";
 import { useImageGallery } from "@/hooks/use-image-gallery";
+import { MediaStudio } from "@/components/media-studio";
 
 // NVIDIA image generation via our API route. When NVIDIA can't finish within
 // the route's window it returns { pending, reqId }; we then poll the status
@@ -515,40 +516,6 @@ function MultiPlatformPrompt({
   const [genErrors, setGenErrors] = useState<Record<string, string | null>>({});
 
   // ─── Image model comparison (Flux vs SD 3.5) ───────────────────────────────
-  type CompareModel = 'flux' | 'sd35';
-  const COMPARE_MODELS: CompareModel[] = ['flux', 'sd35'];
-  const compareLabel = (m: CompareModel) =>
-    m === 'flux' ? 'FLUX.2 Klein (Fast)' : 'FLUX.1 Dev (HQ)';
-  const [compareOpen, setCompareOpen] = useState(false);
-  const [compareState, setCompareState] = useState<Record<CompareModel, 'idle' | 'loading' | 'done' | 'error'>>({ flux: 'idle', sd35: 'idle' });
-  const [compareImages, setCompareImages] = useState<Record<CompareModel, string | null>>({ flux: null, sd35: null });
-  const [compareErrors, setCompareErrors] = useState<Record<CompareModel, string | null>>({ flux: null, sd35: null });
-
-  const generateForCompare = async (model: CompareModel, prompt: string) => {
-    setCompareState(prev => ({ ...prev, [model]: 'loading' }));
-    setCompareErrors(prev => ({ ...prev, [model]: null }));
-    const aspectRatio = qualityMetrics?.suggestedAspectRatio || '16:9';
-    try {
-      const { imageUrl, usedModel } = await generateViaNvidia(model, prompt, aspectRatio, selectedStyle);
-      setCompareImages(prev => ({ ...prev, [model]: imageUrl }));
-      setCompareState(prev => ({ ...prev, [model]: 'done' }));
-      addImage({ dataUri: imageUrl, prompt, platform: model, model: usedModel, aspectRatio });
-    } catch (e: any) {
-      setCompareErrors(prev => ({ ...prev, [model]: e?.message || 'Generation failed' }));
-      setCompareState(prev => ({ ...prev, [model]: 'error' }));
-    }
-  };
-
-  const handleCompareModels = (prompt: string) => {
-    if (!prompt) return;
-    setCompareOpen(true);
-    setCompareImages({ flux: null, sd35: null });
-    // Fire all in parallel — each hits its own serverless function/time budget.
-    COMPARE_MODELS.forEach((m) => generateForCompare(m, prompt));
-  };
-
-  const compareBusy = COMPARE_MODELS.some((m) => compareState[m] === 'loading');
-
   const handleGenerate = async (platform: string, prompt: string) => {
     setGenState(prev => ({ ...prev, [platform]: 'loading' }));
     setGenErrors(prev => ({ ...prev, [platform]: null }));
@@ -883,76 +850,11 @@ function MultiPlatformPrompt({
               <QuickFixChips onFix={onFix} isLoading={isFixing} />
             )}
 
-            {/* Side-by-side image model comparison */}
-            <div className="mt-6 pt-5 border-t border-border/50">
-              <div className="flex items-center justify-between gap-2 mb-3">
-                <div>
-                  <p className="text-sm font-semibold flex items-center gap-2">
-                    <Columns className="w-4 h-4 text-primary" />
-                    Compare image models
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Generate this prompt on FLUX.2 Klein (fast) and FLUX.1 Dev (HQ) at once.
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleCompareModels(masterPrompt || "")}
-                  disabled={!masterPrompt || compareBusy}
-                  className="gap-2 shrink-0"
-                >
-                  {compareBusy ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Columns className="w-4 h-4" />
-                  )}
-                  Compare models
-                </Button>
-              </div>
-
-              {compareOpen && (
-                <div className="grid grid-cols-2 gap-3 md:gap-4">
-                  {COMPARE_MODELS.map((m) => (
-                    <div key={m} className="rounded-xl border border-border bg-card overflow-hidden">
-                      <div className="px-3 py-2 border-b border-border/60 bg-muted/40 flex items-center justify-between">
-                        <span className="text-xs sm:text-sm font-semibold truncate">
-                          {compareLabel(m)}
-                        </span>
-                        {compareImages[m] && (
-                          <a
-                            href={compareImages[m]!}
-                            download={`promptstudio-${m}.jpg`}
-                            className="w-7 h-7 rounded-md hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-                            title="Download"
-                          >
-                            <Download className="h-3.5 w-3.5" />
-                          </a>
-                        )}
-                      </div>
-                      <div className="aspect-square bg-muted/50 flex items-center justify-center p-2 text-center">
-                        {compareState[m] === 'loading' && (
-                          <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                            <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                            <span className="text-xs">Generating…</span>
-                          </div>
-                        )}
-                        {compareState[m] === 'error' && (
-                          <p className="text-[11px] text-destructive line-clamp-4">{compareErrors[m]}</p>
-                        )}
-                        {compareImages[m] && (
-                          /* eslint-disable-next-line @next/next/no-img-element */
-                          <img src={compareImages[m]!} alt={m} className="w-full h-full object-cover rounded-md" />
-                        )}
-                        {compareState[m] === 'idle' && (
-                          <span className="text-xs text-muted-foreground">Waiting…</span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            {/* Media Studio: multi-model image + video generation */}
+            <MediaStudio
+              masterPrompt={masterPrompt || ""}
+              aspectRatio={qualityMetrics?.suggestedAspectRatio || "16:9"}
+            />
         </TabsContent>
 
         {Object.entries(currentPrompts).map(([platform, prompt]) => (
