@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { styleProfiles, BrandStyle } from '@/ai/utils/style-profiles';
 import { verifyToken } from '@/lib/auth';
 
 // Image models are slow — claim the full serverless budget. Route handlers do
@@ -34,8 +33,6 @@ const SD_URL =
 const QWEN_URL = process.env.NVIDIA_QWEN_URL || FLUX_URL;
 
 // Base negative prompt for SD3 to prevent generic stock look
-const SD_BASE_NEGATIVE = "stock photo, watermark, amateur, blurry, distorted, low quality, grainy, text, signature, frame, border, disembodied hands, messy background";
-
 // Terms that reliably trip NVIDIA's safety filter even for benign content.
 // We replace them with semantically equivalent safe alternatives.
 const SD_FILTER_REPLACEMENTS: [RegExp, string][] = [
@@ -375,34 +372,23 @@ function buildNimRequest(
   model: 'flux' | 'sd35' | 'qwen',
   opts: { prompt: string; negativePrompt?: string; aspectRatio: string; seed?: number; stylePreset?: string }
 ) {
-  // Get style-specific negative prompts
-  let styleNegatives = "";
-  if (opts.stylePreset && styleProfiles[opts.stylePreset as BrandStyle]) {
-    styleNegatives = styleProfiles[opts.stylePreset as BrandStyle].negativePrompts.join(", ");
-  }
-
   // Calculate dimensions based on aspect ratio
   // Flux Dev on NIM has strict resolution support.
   // Verified working: 1024x1024, 1344x768, 768x1344
   const { width, height } = aspectRatioToDims(opts.aspectRatio);
 
-  // Combine user negative prompt, style negatives, and base negatives (used by
-  // the aspect-ratio-based models: SD 3.5 and Qwen-Image).
-  const combinedNegative = [
-    opts.negativePrompt,
-    styleNegatives,
-    SD_BASE_NEGATIVE
-  ].filter(Boolean).join(", ");
-
   // All live NVIDIA Flux endpoints take width/height (verified). Distilled
   // variants (klein / schnell) want ~4 steps; dev wants 20-30.
+  // Prompt limits differ per model: FLUX.2 Klein rejects prompts over 800
+  // chars with a 422 ("String should have at most 800 characters").
   const url = model === 'sd35' ? SD_URL : model === 'qwen' ? QWEN_URL : FLUX_URL;
   const isDistilled = /klein|schnell|turbo/i.test(url);
+  const maxPromptLen = isDistilled ? 800 : 1500;
   return {
     url,
     key: NVIDIA_KEY,
     payload: {
-      prompt: opts.prompt,
+      prompt: clampPromptAtWordBoundary(opts.prompt, maxPromptLen),
       width,
       height,
       steps: isDistilled ? 4 : 28,
@@ -411,28 +397,13 @@ function buildNimRequest(
   };
 }
 
-// NVIDIA SD3 only accepts a fixed set of aspect ratios. Map anything else
-// to the closest supported value.
-const SD_SUPPORTED_RATIOS = [
-  '21:9', '16:9', '3:2', '5:4', '1:1', '4:5', '2:3', '9:16', '9:21',
-] as const;
-
-function normalizeSdAspectRatio(ar: string): string {
-  if ((SD_SUPPORTED_RATIOS as readonly string[]).includes(ar)) return ar;
-  const m = ar.match(/^(\d+):(\d+)$/);
-  if (!m) return '16:9';
-  const r = parseInt(m[1], 10) / parseInt(m[2], 10);
-  let best = '1:1';
-  let bestDiff = Infinity;
-  for (const candidate of SD_SUPPORTED_RATIOS) {
-    const [cw, ch] = candidate.split(':').map(Number);
-    const diff = Math.abs(cw / ch - r);
-    if (diff < bestDiff) {
-      bestDiff = diff;
-      best = candidate;
-    }
-  }
-  return best;
+// Truncate at the last word boundary under maxLen so the model never sees a
+// chopped word, and the payload always passes the endpoint's length check.
+function clampPromptAtWordBoundary(text: string, maxLen: number): string {
+  if (text.length <= maxLen) return text;
+  const cut = text.slice(0, maxLen);
+  const lastSpace = cut.lastIndexOf(' ');
+  return (lastSpace > maxLen * 0.6 ? cut.slice(0, lastSpace) : cut).trim();
 }
 
 // Flux NIM supports specific resolutions only. Pick the closest of the three

@@ -309,7 +309,7 @@ function PromptDisplay({
                 ) : (
                     <>
                         <ImageIcon className="w-4 h-4 mr-2" />
-                        Generate with {platform === 'flux' ? 'Flux (Fast)' : 'Flux Dev (HQ)'}
+                        Generate Image {platform === 'flux' ? '(Fast)' : '(HQ)'}
                     </>
                 )}
             </Button>
