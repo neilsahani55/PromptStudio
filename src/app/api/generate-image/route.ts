@@ -9,8 +9,11 @@ import { verifyToken } from '@/lib/auth';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-const FLUX_KEY = process.env.NVIDIA_API_KEY_FLUX;
-const SD35_KEY = process.env.NVIDIA_API_KEY_SD35;
+// One NVIDIA key powers every model (text + image). An optional second key is
+// used automatically as a fallback when the primary is rate-limited or rejected.
+const NVIDIA_KEY = process.env.NVIDIA_API_KEY;
+const NVIDIA_KEY_FALLBACK = process.env.NVIDIA_API_KEY_FALLBACK;
+const NVIDIA_KEYS = [NVIDIA_KEY, NVIDIA_KEY_FALLBACK].filter(Boolean) as string[];
 
 // Direct endpoints for NVIDIA-hosted models.
 // Defaults target models typically available on NVIDIA NIM free tier:
@@ -120,23 +123,34 @@ export async function POST(req: NextRequest) {
     // clean error before Vercel kills the function with a raw 504. Leaves
     // headroom under maxDuration (60s) for JSON parsing and the response.
     const deadline = Date.now() + 52_000;
-    const callNim = (n: typeof nim) => {
+    const fetchOnce = (url: string, payload: unknown, key: string) => {
       const remaining = deadline - Date.now();
       if (remaining <= 2_000) {
         return Promise.reject(new Error('IMAGE_DEADLINE_EXCEEDED'));
       }
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), remaining);
-      return fetch(n.url, {
+      return fetch(url, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${n.key}`,
+          'Authorization': `Bearer ${key}`,
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
-        body: JSON.stringify(n.payload),
+        body: JSON.stringify(payload),
         signal: controller.signal,
       }).finally(() => clearTimeout(timer));
+    };
+    // Try the primary key; on auth (401/403) or rate-limit (429) failure,
+    // transparently retry with the fallback key (if configured) before giving up.
+    const callNim = async (n: typeof nim) => {
+      let res = await fetchOnce(n.url, n.payload, NVIDIA_KEYS[0]);
+      for (let i = 1; i < NVIDIA_KEYS.length; i++) {
+        if (res.ok || (res.status !== 401 && res.status !== 403 && res.status !== 429)) break;
+        console.warn(`NVIDIA primary key failed (${res.status}) — retrying with fallback key.`);
+        res = await fetchOnce(n.url, n.payload, NVIDIA_KEYS[i]);
+      }
+      return res;
     };
 
     let res = await callNim(nim);
@@ -257,7 +271,7 @@ export async function POST(req: NextRequest) {
       const rawB64 = base64.replace(/^data:[^,]+,/, '');
       const byteLen = Math.floor((rawB64.length * 3) / 4);
       if (byteLen < 15_000) {
-        if (model === 'sd35' && FLUX_KEY) {
+        if (model === 'sd35' && NVIDIA_KEY) {
           // SD blocked — silently retry with Flux
           console.warn('SD3.5 content filter triggered, retrying with Flux...');
           const fluxReq = buildNimRequest('flux', { prompt, negativePrompt, aspectRatio, seed, stylePreset });
@@ -356,7 +370,7 @@ function buildNimRequest(
     const isSchnell = FLUX_URL.toLowerCase().includes('schnell');
     return {
       url: FLUX_URL,
-      key: FLUX_KEY,
+      key: NVIDIA_KEY,
       payload: {
         prompt: opts.prompt,
         width,
@@ -377,7 +391,7 @@ function buildNimRequest(
 
   return {
     url: SD_URL,
-    key: SD35_KEY,
+    key: NVIDIA_KEY,
     payload: {
       prompt: opts.prompt,
       aspect_ratio: normalizeSdAspectRatio(opts.aspectRatio),

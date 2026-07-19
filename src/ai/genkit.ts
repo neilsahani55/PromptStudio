@@ -75,6 +75,24 @@ if (process.env.NVIDIA_API_KEY) {
             versions: ['moonshotai/kimi-k2-instruct-0905']
           },
           configSchema: OpenAiConfigSchema
+        },
+        {
+          name: 'nvidia/llama-3.1-nemotron-70b-instruct',
+          info: {
+            label: 'Nemotron 70B (NVIDIA)',
+            supports: { multiturn: true, media: false, tools: true },
+            versions: ['nvidia/llama-3.1-nemotron-70b-instruct']
+          },
+          configSchema: OpenAiConfigSchema
+        },
+        {
+          name: 'meta/llama-3.3-70b-instruct',
+          info: {
+            label: 'Llama 3.3 70B',
+            supports: { multiturn: true, media: false, tools: true },
+            versions: ['meta/llama-3.3-70b-instruct']
+          },
+          configSchema: OpenAiConfigSchema
         }
       ]
     })
@@ -86,7 +104,9 @@ if (process.env.NVIDIA_API_KEY) {
     { id: 'openai/moonshotai/kimi-k2-instruct-0905', label: 'Moonshot Kimi k2 Instruct' },
     { id: 'openai/qwen/qwen3.5-397b-a17b', label: 'Qwen 3.5 (397B)' },
     { id: 'openai/z-ai/glm4.7', label: 'GLM 4.7' },
-    { id: 'openai/openai/gpt-oss-120b', label: 'GPT-OSS 120B (NVIDIA)' }
+    { id: 'openai/openai/gpt-oss-120b', label: 'GPT-OSS 120B (NVIDIA)' },
+    { id: 'openai/nvidia/llama-3.1-nemotron-70b-instruct', label: 'Nemotron 70B (NVIDIA)' },
+    { id: 'openai/meta/llama-3.3-70b-instruct', label: 'Llama 3.3 70B' }
   );
 } else {
   console.warn("NVIDIA_API_KEY not found. NVIDIA models will be unavailable.");
