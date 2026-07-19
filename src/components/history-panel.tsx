@@ -1,12 +1,47 @@
-import React, { useState } from 'react';
-import { Trash2, Star, Copy, Check, Search, SlidersHorizontal, Tag, X, Pencil } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Trash2, Star, Copy, Check, Search, SlidersHorizontal, Tag, X, Pencil, Image as ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { HistoryItem, HistorySortBy, HistoryFilterBy } from '@/hooks/use-history';
+import { useImageGallery, type GalleryImage } from '@/hooks/use-image-gallery';
 import { formatDistanceToNow } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+
+// ─── Link gallery images to history items by prompt text ────────────────────
+// Every gallery image stores the exact prompt it was generated from, and that
+// prompt string lives somewhere inside the history item's result payload. So
+// we deep-collect the long strings from each item's result and match on a
+// normalized prefix — no schema coupling, works retroactively.
+function collectPromptStrings(obj: unknown, out: string[], depth = 0): void {
+  if (depth > 6 || out.length > 80) return;
+  if (typeof obj === 'string') {
+    if (obj.length >= 60) out.push(obj);
+    return;
+  }
+  if (Array.isArray(obj)) {
+    for (const v of obj) collectPromptStrings(v, out, depth + 1);
+    return;
+  }
+  if (obj && typeof obj === 'object') {
+    for (const v of Object.values(obj)) collectPromptStrings(v, out, depth + 1);
+  }
+}
+
+const promptKey = (s: string) => s.trim().slice(0, 160);
+
+// Open a gallery image in a new tab. Goes through a blob URL because browsers
+// block direct top-level navigation to data: URIs.
+async function openImageInNewTab(img: GalleryImage) {
+  try {
+    const resp = await fetch(img.dataUri);
+    const blob = await resp.blob();
+    window.open(URL.createObjectURL(blob), '_blank');
+  } catch {
+    window.open(img.dataUri, '_blank');
+  }
+}
 import {
   Select,
   SelectContent,
@@ -53,7 +88,22 @@ export function HistoryPanel({
   totalCount,
 }: HistoryPanelProps) {
   const { toast } = useToast();
+  const { images: galleryImages } = useImageGallery();
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // itemId → images generated from any of that item's prompts.
+  const imagesByItem = useMemo(() => {
+    const map: Record<string, GalleryImage[]> = {};
+    if (galleryImages.length === 0) return map;
+    for (const item of history) {
+      const candidates: string[] = [];
+      collectPromptStrings(item.result, candidates);
+      const keys = new Set(candidates.map(promptKey));
+      const matched = galleryImages.filter((img) => img.prompt && keys.has(promptKey(img.prompt)));
+      if (matched.length > 0) map[item.id] = matched;
+    }
+    return map;
+  }, [history, galleryImages]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [tagInputId, setTagInputId] = useState<string | null>(null);
@@ -216,6 +266,12 @@ export function HistoryPanel({
                           Score: {item.qualityScore}/10
                         </span>
                       )}
+                      {imagesByItem[item.id] && (
+                        <span className="text-xs font-medium text-primary flex items-center gap-1">
+                          <ImageIcon className="w-3 h-3" />
+                          {imagesByItem[item.id].length} image{imagesByItem[item.id].length > 1 ? 's' : ''} generated
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -247,6 +303,29 @@ export function HistoryPanel({
                 <p className="text-sm text-muted-foreground line-clamp-2">
                   {item.input}
                 </p>
+
+                {/* Generated image thumbnails */}
+                {imagesByItem[item.id] && (
+                  <div className="flex gap-2 overflow-x-auto pb-1" onClick={(e) => e.stopPropagation()}>
+                    {imagesByItem[item.id].map((img) => (
+                      <button
+                        key={img.id}
+                        type="button"
+                        onClick={() => openImageInNewTab(img)}
+                        className="shrink-0 rounded-md overflow-hidden border border-border hover:ring-2 hover:ring-primary/50 transition-shadow"
+                        title={`Generated with ${img.model || img.platform} — click to view full size`}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={img.dataUri}
+                          alt="Generated result"
+                          className="h-16 w-16 object-cover"
+                          loading="lazy"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 {/* Tags */}
                 <div className="flex items-center gap-1.5 flex-wrap" onClick={(e) => e.stopPropagation()}>
