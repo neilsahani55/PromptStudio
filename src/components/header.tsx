@@ -4,6 +4,7 @@ import { Sparkles, LogOut, Shield, Settings, MessageSquare } from 'lucide-react'
 import Link from 'next/link';
 import { useAuth } from './auth-provider';
 import { ThemePalette } from './theme-palette';
+import { ImageGallery } from './image-gallery';
 import { Logo } from './logo';
 import { Button } from '@/components/ui/button';
 import { useFeedbackNotifications } from '@/hooks/use-feedback-notifications';
@@ -44,6 +45,8 @@ export function Header() {
             <Sparkles className="w-3 h-3 text-primary" />
             <span>Powered by AI</span>
           </div>
+
+          {!loading && user && <ImageGallery />}
 
           <ThemePalette />
 

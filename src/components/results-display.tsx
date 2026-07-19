@@ -14,6 +14,7 @@ import { Progress } from "@/components/ui/progress";
 import { submitFeedback } from "@/app/actions";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { QuickFixChips, FixType } from "@/components/quick-fix-chips";
+import { useImageGallery } from "@/hooks/use-image-gallery";
 import { styleProfiles, BrandStyle } from "@/ai/utils/style-profiles";
 
 const copyToClipboard = (text: string, toast: (options: any) => void, onCopySuccess?: () => void) => {
@@ -438,6 +439,7 @@ function MultiPlatformPrompt({
   isRefining?: boolean,
 }) {
   const { toast } = useToast();
+  const { addImage } = useImageGallery();
   const [activeVariantIndex, setActiveVariantIndex] = useState(-1);
   const [feedbackStatus, setFeedbackStatus] = useState<'none' | 'liked' | 'disliked'>('none');
   const [selectedStyle, setSelectedStyle] = useState<BrandStyle>('modern_saas_3d');
@@ -496,6 +498,15 @@ function MultiPlatformPrompt({
 
         setGeneratedImages(prev => ({ ...prev, [platform]: imageUrl }));
         setGenState(prev => ({ ...prev, [platform]: 'done' }));
+
+        // Persist to the local gallery so users can revisit generated images.
+        addImage({
+          dataUri: imageUrl,
+          prompt,
+          platform,
+          model: data.model || model,
+          aspectRatio: qualityMetrics?.suggestedAspectRatio || '16:9',
+        });
 
         if (data.fallbackUsed) {
             toast({
