@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { verifyToken } from '@/lib/auth';
 import { getMediaModel, providerConfigured, type MediaModel } from '@/lib/media-models';
+import { DAILY_CREDITS, CREDIT_COSTS, getCreditsUsedToday, chargeCredits, refundCredits } from '@/lib/credits';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -167,9 +168,11 @@ async function runHf(model: MediaModel, prompt: string, deadline: number) {
 
 export async function POST(req: NextRequest) {
   const deadline = Date.now() + 55_000;
+  let ledgerId = 0;
   try {
     const token = req.cookies.get('auth-token')?.value;
-    if (!token || !(await verifyToken(token))) {
+    const auth = token ? await verifyToken(token) : null;
+    if (!auth) {
       return errJson(401, 'Authentication required');
     }
 
@@ -185,18 +188,43 @@ export async function POST(req: NextRequest) {
         'Add the provider keys in your environment (see ENVIRONMENT.md).');
     }
 
+    // ── Daily credits (admins are unlimited) ────────────────────────────────
+    if (auth.role !== 'admin') {
+      const cost = CREDIT_COSTS[model.kind];
+      const used = await getCreditsUsedToday(auth.userId);
+      const remaining = Math.max(0, DAILY_CREDITS - used);
+      if (cost > remaining) {
+        return errJson(
+          429,
+          'Daily credit limit reached',
+          `You've used ${used}/${DAILY_CREDITS} free daily credits (images cost 1, videos cost 2)` +
+            (remaining > 0 ? ` — this ${model.kind} needs ${cost} but only ${remaining} remain.` : '.'),
+          'Your credits reset every day at midnight UTC. Come back tomorrow — or ask the admin for more.'
+        );
+      }
+      ledgerId = await chargeCredits(auth.userId, model.id, model.kind);
+    }
+
     const prompt = clampPrompt(parsed.data.prompt, model.maxPrompt);
     const seed = parsed.data.seed ?? Math.floor(Math.random() * 1_000_000);
 
+    let res: NextResponse;
     switch (model.provider) {
       case 'nvidia':
-        return await runNvidia(model, prompt, aspectRatio, seed, deadline);
+        res = await runNvidia(model, prompt, aspectRatio, seed, deadline);
+        break;
       case 'cloudflare':
-        return await runCloudflare(model, prompt, deadline);
+        res = await runCloudflare(model, prompt, deadline);
+        break;
       case 'hf':
-        return await runHf(model, prompt, deadline);
+        res = await runHf(model, prompt, deadline);
+        break;
     }
+    // Provider failed — the user shouldn't lose a credit for it.
+    if (res.status >= 400 && ledgerId) await refundCredits(ledgerId);
+    return res;
   } catch (err: any) {
+    if (ledgerId) await refundCredits(ledgerId);
     if (err?.name === 'AbortError') {
       return errJson(504, 'Generation timed out', 'The provider took too long to respond.');
     }

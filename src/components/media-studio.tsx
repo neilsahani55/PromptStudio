@@ -28,6 +28,15 @@ interface Result {
 
 const MAX_SELECT: Record<"image" | "video", number> = { image: 4, video: 2 };
 
+interface CreditsInfo {
+  total: number;
+  used: number;
+  remaining: number;
+  unlimited: boolean;
+  imageCost: number;
+  videoCost: number;
+}
+
 // Poll the NVCF status endpoint for NVIDIA async jobs (each poll is its own
 // short request — total time is not bound by any single 60s function).
 async function pollStatus(reqId: string): Promise<{ base64: string | null; url: string | null }> {
@@ -78,6 +87,7 @@ export function MediaStudio({
 
   const [models, setModels] = useState<{ image: StudioModel[]; video: StudioModel[] }>({ image: [], video: [] });
   const [missingProviders, setMissingProviders] = useState<string[]>([]);
+  const [credits, setCredits] = useState<CreditsInfo | null>(null);
   const [mode, setMode] = useState<"image" | "video">("image");
   const [selected, setSelected] = useState<Record<"image" | "video", string[]>>({ image: [], video: [] });
   const [prompts, setPrompts] = useState<Record<"image" | "video", string>>({ image: "", video: "" });
@@ -85,23 +95,29 @@ export function MediaStudio({
   const [results, setResults] = useState<Record<string, Result>>({});
   const [running, setRunning] = useState(false);
 
-  // Load available models once.
-  useEffect(() => {
+  const loadModels = useCallback((initial: boolean) => {
     fetch("/api/media-models", { credentials: "same-origin" })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (!data) return;
         setModels({ image: data.image || [], video: data.video || [] });
         setMissingProviders(data.missingProviders || []);
-        // Sensible defaults: first two image models pre-selected.
-        setSelected((prev) => ({
-          ...prev,
-          image: (data.image || []).slice(0, 2).map((m: StudioModel) => m.id),
-          video: (data.video || []).slice(0, 1).map((m: StudioModel) => m.id),
-        }));
+        if (data.credits) setCredits(data.credits);
+        if (initial) {
+          // Sensible defaults: first two image models pre-selected.
+          setSelected((prev) => ({
+            ...prev,
+            image: (data.image || []).slice(0, 2).map((m: StudioModel) => m.id),
+            video: (data.video || []).slice(0, 1).map((m: StudioModel) => m.id),
+          }));
+        }
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    loadModels(true);
+  }, [loadModels]);
 
   // Seed the image prompt from the master prompt whenever it changes.
   useEffect(() => {
@@ -184,7 +200,11 @@ export function MediaStudio({
     });
     await Promise.all(chosen.map((id) => generateOne(id, prompt)));
     setRunning(false);
+    // Refresh the credits badge with what the server actually charged.
+    loadModels(false);
   };
+
+  const outOfCredits = !!credits && !credits.unlimited && credits.remaining <= 0;
 
   const activeModels = models[mode];
   const chosen = selected[mode];
@@ -204,6 +224,20 @@ export function MediaStudio({
             Generate with up to {MAX_SELECT[mode]} {mode} models at once, then pick the best.
           </p>
         </div>
+        {credits && (
+          <span
+            className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border ${
+              credits.unlimited
+                ? "border-primary/30 bg-primary/10 text-primary"
+                : outOfCredits
+                ? "border-destructive/40 bg-destructive/10 text-destructive"
+                : "border-border bg-card text-foreground"
+            }`}
+            title={`Images cost ${credits.imageCost} credit, videos cost ${credits.videoCost}. Resets daily at midnight UTC.`}
+          >
+            ⚡ {credits.unlimited ? "Unlimited (admin)" : `${credits.remaining}/${credits.total} credits today`}
+          </span>
+        )}
         <div className="flex rounded-lg border border-border overflow-hidden">
           {(["image", "video"] as const).map((m) => (
             <button
@@ -286,12 +320,18 @@ export function MediaStudio({
       {/* Generate */}
       <Button
         onClick={handleGenerate}
-        disabled={running || chosen.length === 0}
+        disabled={running || chosen.length === 0 || outOfCredits}
         className="w-full bg-gradient-to-r from-primary to-primary/80 text-primary-foreground hover:opacity-90 gap-2"
       >
         {running ? <Loader2 className="w-4 h-4 animate-spin" /> : mode === "image" ? <ImageIcon className="w-4 h-4" /> : <Film className="w-4 h-4" />}
-        {running ? "Generating…" : `Generate ${chosen.length || ""} ${mode}${chosen.length > 1 ? "s" : ""}`}
+        {running ? "Generating…" : outOfCredits ? "Daily credits used" : `Generate ${chosen.length || ""} ${mode}${chosen.length > 1 ? "s" : ""}`}
       </Button>
+      {outOfCredits && (
+        <p className="text-xs text-center text-destructive -mt-2">
+          You&apos;ve used all {credits!.total} free daily credits (images {credits!.imageCost}, videos {credits!.videoCost}).
+          They reset at midnight UTC — see you tomorrow!
+        </p>
+      )}
 
       {/* Results grid */}
       {chosen.some((id) => results[id]) && (

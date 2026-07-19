@@ -36,7 +36,9 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await exec(
-      'INSERT INTO feedback (user_id, type, title, message) VALUES (?, ?, ?, ?)',
+      `INSERT INTO feedback (user_id, user_name, type, title, message)
+       VALUES (?, (SELECT name FROM users WHERE id = ?), ?, ?, ?)`,
+      auth.userId,
       auth.userId,
       type,
       title.trim(),
