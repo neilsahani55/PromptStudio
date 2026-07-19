@@ -3,6 +3,12 @@ import { z } from 'zod';
 import { styleProfiles, BrandStyle } from '@/ai/utils/style-profiles';
 import { verifyToken } from '@/lib/auth';
 
+// Image models are slow — claim the full serverless budget. Route handlers do
+// NOT inherit the layout's maxDuration, so it must be declared here or the
+// function is capped at the platform default and returns a raw 504.
+export const runtime = 'nodejs';
+export const maxDuration = 60;
+
 const FLUX_KEY = process.env.NVIDIA_API_KEY_FLUX;
 const SD35_KEY = process.env.NVIDIA_API_KEY_SD35;
 
@@ -110,8 +116,18 @@ export async function POST(req: NextRequest) {
       console.log(`Sending request to ${nim.url} for model ${model}`);
     }
 
-    const callNim = (n: typeof nim) =>
-      fetch(n.url, {
+    // Shared time budget across the (possibly two) NVIDIA calls, so we return a
+    // clean error before Vercel kills the function with a raw 504. Leaves
+    // headroom under maxDuration (60s) for JSON parsing and the response.
+    const deadline = Date.now() + 52_000;
+    const callNim = (n: typeof nim) => {
+      const remaining = deadline - Date.now();
+      if (remaining <= 2_000) {
+        return Promise.reject(new Error('IMAGE_DEADLINE_EXCEEDED'));
+      }
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), remaining);
+      return fetch(n.url, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${n.key}`,
@@ -119,7 +135,9 @@ export async function POST(req: NextRequest) {
           'Accept': 'application/json',
         },
         body: JSON.stringify(n.payload),
-      });
+        signal: controller.signal,
+      }).finally(() => clearTimeout(timer));
+    };
 
     let res = await callNim(nim);
 
@@ -296,6 +314,19 @@ export async function POST(req: NextRequest) {
       { status: 200 }
     );
   } catch (err: any) {
+    // Our abort timer or the shared deadline fired — return a clean, actionable
+    // error instead of letting Vercel emit a raw 504 with no explanation.
+    if (err?.name === 'AbortError' || err?.message === 'IMAGE_DEADLINE_EXCEEDED') {
+      console.error('Image generation timed out (>50s).');
+      return NextResponse.json(
+        {
+          error: 'Image generation timed out.',
+          detail: 'The image model took too long to respond (over ~50s).',
+          hint: 'Flux (Schnell) is the fastest option — try it, simplify the prompt, or use a standard aspect ratio. SD 3.5 Large is the slowest model.',
+        },
+        { status: 504 }
+      );
+    }
     console.error("API Route Error:", err);
     return NextResponse.json(
       { error: 'An unexpected error occurred.' },
@@ -352,8 +383,8 @@ function buildNimRequest(
       aspect_ratio: normalizeSdAspectRatio(opts.aspectRatio),
       seed: opts.seed ?? 0,
       negative_prompt: combinedNegative,
-      cfg_scale: 8.0, // Increased guidance for better adherence
-      steps: 40     // Higher steps for better quality
+      cfg_scale: 7.0, // Balanced guidance
+      steps: 30     // 30 steps: near-40 quality, meaningfully faster (fits 60s budget)
     },
   };
 }
