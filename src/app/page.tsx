@@ -432,7 +432,7 @@ export default function LandingPage() {
         <div className="border-t border-border/50">
           <p className="container mx-auto max-w-6xl px-4 md:px-6 py-4 text-center text-xs text-muted-foreground">
             © 2026 PromptStudio · Built by <span className="text-foreground font-medium">Neel Sahani</span> · Contact:{" "}
-            <a href="mailto:promptstudio55@gmail.com" className="text-primary hover:underline">promptstudio55@gmail.com</a>
+            <a href="mailto:promptstudios55@gmail.com" className="text-primary hover:underline">promptstudios55@gmail.com</a>
           </p>
         </div>
       </footer>

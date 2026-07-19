@@ -4,7 +4,7 @@ An AI-powered prompt-generation studio that turns blog posts, screenshots, or an
 
 Built with Next.js 15, React 19, Google Genkit, Supabase, NVIDIA NIM, Cloudflare Workers AI, and Hugging Face Inference Providers.
 
-**Live:** https://promptstudios.vercel.app · Built by **Neel Sahani** · Contact: promptstudio55@gmail.com
+**Live:** https://promptstudios.vercel.app · Built by **Neel Sahani** · Contact: promptstudios55@gmail.com
 
 ---
 
@@ -177,7 +177,7 @@ The database is **Supabase Postgres** — serverless-friendly on every platform:
 
 **PromptStudio** is built and maintained by **Neel Sahani**.
 
-- 📧 Contact: [promptstudio55@gmail.com](mailto:promptstudio55@gmail.com)
+- 📧 Contact: [promptstudios55@gmail.com](mailto:promptstudios55@gmail.com)
 - 🌐 Live app: https://promptstudios.vercel.app
 - 💬 Feedback: use the in-app feedback dialog — it lands straight in the owner's inbox
 
