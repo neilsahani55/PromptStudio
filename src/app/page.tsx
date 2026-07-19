@@ -12,16 +12,34 @@ import {
   Image as ImageIcon,
   Gauge,
   Palette,
-  History,
   ShieldCheck,
   Cpu,
   ArrowRight,
   Check,
   Zap,
-  Layers,
+  Film,
+  KeyRound,
+  CloudUpload,
 } from "lucide-react";
 
-const PLATFORMS = ["Midjourney v6", "DALL·E 3", "Stable Diffusion XL", "Flux"];
+const PROMPT_FORMATS = ["Master (Universal)", "Midjourney v6", "DALL·E 3", "Stable Diffusion", "Flux"];
+
+const IMAGE_MODELS = [
+  { name: "FLUX.2 Klein", provider: "NVIDIA", tag: "Fast" },
+  { name: "FLUX.1 Dev", provider: "NVIDIA", tag: "High quality" },
+  { name: "FLUX.1 Schnell", provider: "Cloudflare", tag: "Fast" },
+  { name: "SDXL Lightning", provider: "Cloudflare", tag: "Realistic" },
+  { name: "SDXL Base", provider: "Cloudflare", tag: "Classic" },
+  { name: "DreamShaper 8", provider: "Cloudflare", tag: "Artistic" },
+  { name: "FLUX.1 Schnell", provider: "Hugging Face", tag: "Fast" },
+  { name: "SDXL", provider: "Hugging Face", tag: "Classic" },
+  { name: "Qwen-Image", provider: "Hugging Face", tag: "Text-in-image" },
+];
+
+const VIDEO_MODELS = [
+  { name: "Wan 2.2", provider: "Hugging Face · fal", tag: "Cinematic" },
+  { name: "HunyuanVideo", provider: "Hugging Face · fal", tag: "13B cinematic" },
+];
 
 const FEATURES = [
   {
@@ -31,18 +49,18 @@ const FEATURES = [
   },
   {
     icon: Wand2,
-    title: "Media Studio — up to 4 models at once",
-    body: "Generate the same prompt on up to 4 image models side by side (FLUX, SDXL, Qwen-Image and more) and keep the best result.",
+    title: "Media Studio — 4 models at once",
+    body: "Generate the same prompt on up to 4 image models side by side and keep the best. FLUX, SDXL, Qwen-Image and more.",
   },
   {
-    icon: ImageIcon,
+    icon: Film,
     title: "Video generation",
-    body: "Turn your master prompt into motion: auto-adapted video prompts rendered with Wan 2.2 and HunyuanVideo.",
+    body: "Your master prompt is auto-adapted with motion and camera language, then rendered with Wan 2.2 or HunyuanVideo.",
   },
   {
-    icon: Cpu,
+    icon: KeyRound,
     title: "Bring your own API keys",
-    body: "Add your own Hugging Face, NVIDIA, OpenAI, Gemini, DeepSeek or Ollama keys — verified live, stored encrypted, generation on your own quota.",
+    body: "Add your own Hugging Face, NVIDIA, OpenAI, Gemini, DeepSeek or Ollama keys — live-verified, stored encrypted, generation on your own quota.",
   },
   {
     icon: Gauge,
@@ -50,7 +68,7 @@ const FEATURES = [
     body: "10 free credits every day (images 1, videos 2) with automatic refunds when a provider fails. Resets at midnight UTC.",
   },
   {
-    icon: Palette,
+    icon: CloudUpload,
     title: "Cloud gallery + 10 themes",
     body: "Every generation saved to your account-synced gallery, in an interface that recolours across ten hand-tuned themes.",
   },
@@ -60,28 +78,28 @@ const STEPS = [
   {
     n: "01",
     title: "Drop in your content",
-    body: "Paste a blog post, article, or idea — or upload a screenshot you want to reimagine.",
+    body: "Paste a blog post, article, or idea — or upload a screenshot you want to reimagine. One-click Enhance turns rough ideas into rich briefs.",
     icon: FileText,
   },
   {
     n: "02",
     title: "AI crafts the prompts",
-    body: "PromptStudio analyses intent and generates optimized, platform-specific prompts with quality scores.",
+    body: "A master universal prompt plus platform-tuned versions for Midjourney, DALL·E 3, Stable Diffusion and Flux — with quality scores and 3 creative variants.",
     icon: Wand2,
   },
   {
     n: "03",
-    title: "Generate & refine",
-    body: "Create images in-app, tweak with quick-fix chips, and save everything to your searchable history.",
+    title: "Generate images & video",
+    body: "Fire up to 4 image models at once, compare results side by side, switch to Video mode for motion — everything lands in your gallery.",
     icon: Sparkles,
   },
 ];
 
 const HIGHLIGHTS = [
-  { icon: Zap, label: "Automatic model fallback" },
-  { icon: History, label: "Searchable local history" },
-  { icon: ShieldCheck, label: "JWT auth + admin panel" },
-  { icon: Layers, label: "3 creative variants per run" },
+  { icon: ImageIcon, label: "9 image models · 2 video models" },
+  { icon: KeyRound, label: "Bring your own API keys" },
+  { icon: Zap, label: "10 free credits daily" },
+  { icon: ShieldCheck, label: "Google sign-in — no fake accounts" },
 ];
 
 function LandingNav() {
@@ -98,7 +116,7 @@ function LandingNav() {
           <div>
             <span className="text-lg font-bold font-headline tracking-tight">PromptStudio</span>
             <p className="text-[11px] text-muted-foreground leading-none hidden sm:block">
-              Content to Image Prompt Generator
+              Prompts · Images · Video
             </p>
           </div>
         </Link>
@@ -131,10 +149,16 @@ function LandingNav() {
   );
 }
 
+// Mockup of the Media Studio: prompt → 4 image models generating side by side.
 function HeroMockup() {
+  const cells = [
+    { label: "FLUX.2 Klein", state: "done" },
+    { label: "SDXL Lightning", state: "done" },
+    { label: "Qwen-Image", state: "gen" },
+    { label: "Wan 2.2 · video", state: "video" },
+  ];
   return (
     <div className="relative mx-auto w-full max-w-md">
-      {/* Glow */}
       <div className="absolute -inset-6 bg-primary/20 blur-3xl rounded-full opacity-60" />
       <div className="relative rounded-2xl border border-border bg-card shadow-2xl shadow-primary/10 overflow-hidden">
         {/* Window chrome */}
@@ -142,43 +166,44 @@ function HeroMockup() {
           <span className="w-3 h-3 rounded-full bg-destructive/60" />
           <span className="w-3 h-3 rounded-full bg-primary/60" />
           <span className="w-3 h-3 rounded-full bg-secondary" />
-          <span className="ml-3 text-xs text-muted-foreground font-code">promptstudio / generate</span>
+          <span className="ml-3 text-xs text-muted-foreground font-code">promptstudio / media-studio</span>
+          <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+            ⚡ 8/10 credits
+          </span>
         </div>
 
         <div className="p-5 space-y-4">
-          {/* Input */}
+          {/* Prompt */}
           <div className="rounded-lg border border-border/60 bg-background/60 p-3">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
-              <FileText className="h-3 w-3" /> Blog input
+              <Wand2 className="h-3 w-3" /> Master prompt
             </p>
             <p className="text-sm text-foreground/80 leading-snug">
-              &ldquo;How sustainable urban gardens are transforming city rooftops into green sanctuaries…&rdquo;
+              &ldquo;Lush rooftop garden at golden hour, cinematic wide angle, warm volumetric light…&rdquo;
             </p>
           </div>
 
-          <div className="flex items-center justify-center">
-            <div className="flex items-center gap-2 text-xs font-medium text-primary">
-              <Wand2 className="h-4 w-4 animate-pulse" /> Generating optimized prompts
-            </div>
-          </div>
-
-          {/* Output chips */}
-          <div className="space-y-2">
-            {[
-              { p: "Midjourney", q: 96, t: "Lush rooftop garden at golden hour, cinematic wide angle --ar 16:9 --v 6" },
-              { p: "Flux", q: 94, t: "Photorealistic urban green sanctuary, soft volumetric light, 4k detail" },
-              { p: "DALL·E 3", q: 92, t: "Vibrant city rooftop farm, families tending raised beds, warm tones" },
-            ].map((row) => (
-              <div key={row.p} className="rounded-lg border border-border/60 bg-background/40 p-2.5">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-semibold">{row.p}</span>
-                  <span className="text-[10px] font-code px-1.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-                    {row.q}% quality
-                  </span>
+          {/* Model grid */}
+          <div className="grid grid-cols-2 gap-2.5">
+            {cells.map((c) => (
+              <div key={c.label} className="rounded-lg border border-border/60 bg-background/40 overflow-hidden">
+                <div className="px-2.5 py-1.5 border-b border-border/50 flex items-center justify-between">
+                  <span className="text-[10px] font-semibold truncate">{c.label}</span>
+                  {c.state === "done" && <Check className="w-3 h-3 text-primary shrink-0" />}
                 </div>
-                <p className="text-[11px] text-muted-foreground font-code leading-snug line-clamp-2">{row.t}</p>
+                <div className="aspect-[4/3] flex items-center justify-center bg-gradient-to-br from-primary/15 via-accent/10 to-secondary/20">
+                  {c.state === "gen" && (
+                    <span className="text-[10px] text-muted-foreground animate-pulse">generating…</span>
+                  )}
+                  {c.state === "video" && <Film className="w-5 h-5 text-primary/70" />}
+                  {c.state === "done" && <ImageIcon className="w-5 h-5 text-primary/70" />}
+                </div>
               </div>
             ))}
+          </div>
+
+          <div className="flex items-center justify-center gap-2 text-xs font-medium text-primary">
+            <Sparkles className="h-3.5 w-3.5" /> Pick the best — all saved to your gallery
           </div>
         </div>
       </div>
@@ -198,7 +223,6 @@ export default function LandingPage() {
 
       {/* ─── Hero ─────────────────────────────────────────────── */}
       <section className="relative overflow-hidden bg-dot-grid">
-        {/* Ambient blobs */}
         <div className="pointer-events-none absolute -top-24 -left-24 w-96 h-96 bg-primary/20 blur-3xl rounded-full" />
         <div className="pointer-events-none absolute top-40 -right-24 w-96 h-96 bg-accent/30 blur-3xl rounded-full" />
 
@@ -207,18 +231,19 @@ export default function LandingPage() {
             <div className="text-center lg:text-left">
               <div className="inline-flex items-center gap-2 text-xs font-medium text-primary bg-primary/10 border border-primary/20 px-3 py-1.5 rounded-full mb-6">
                 <Sparkles className="w-3.5 h-3.5" />
-                AI-powered prompt engineering
+                Prompts · Images · Video — one studio
               </div>
 
               <h1 className="font-headline text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-[1.05]">
-                Turn any content into{" "}
-                <span className="text-gradient from-primary to-primary/50">stunning image prompts</span>
+                One idea.{" "}
+                <span className="text-gradient from-primary to-primary/50">Every model.</span>{" "}
+                Best result wins.
               </h1>
 
               <p className="mt-6 text-lg text-muted-foreground max-w-xl mx-auto lg:mx-0 leading-relaxed">
-                PromptStudio transforms blog posts, screenshots, and ideas into platform-optimized
-                prompts — then generates <strong className="text-foreground">images and videos</strong> across
-                multiple AI models at once, right in the app. Sign in with Google and create.
+                PromptStudio turns blog posts, screenshots, and ideas into platform-optimized prompts —
+                then generates <strong className="text-foreground">images on up to 4 AI models at once</strong> and{" "}
+                <strong className="text-foreground">videos on 2</strong>, so you compare and keep only the best.
               </p>
 
               <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
@@ -229,7 +254,7 @@ export default function LandingPage() {
                   </Link>
                 </Button>
                 <Button asChild size="lg" variant="outline">
-                  <a href="#how">See how it works</a>
+                  <a href="#models">See the models</a>
                 </Button>
               </div>
 
@@ -250,14 +275,14 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ─── Platforms strip ──────────────────────────────────── */}
+      {/* ─── Prompt formats strip ─────────────────────────────── */}
       <section className="border-y border-border/50 bg-muted/30">
         <div className="container mx-auto max-w-6xl px-4 md:px-6 py-8">
           <p className="text-center text-xs uppercase tracking-widest text-muted-foreground mb-5">
-            One input, optimized for every major platform
+            Every generation includes prompts tuned for
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
-            {PLATFORMS.map((p) => (
+            {PROMPT_FORMATS.map((p) => (
               <span
                 key={p}
                 className="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-full border border-border bg-card"
@@ -274,10 +299,10 @@ export default function LandingPage() {
       <section id="features" className="container mx-auto max-w-6xl px-4 md:px-6 py-20 md:py-28">
         <div className="text-center max-w-2xl mx-auto mb-14">
           <h2 className="font-headline text-3xl sm:text-4xl font-bold tracking-tight">
-            Everything you need to prompt like a pro
+            A complete studio, not just a prompt box
           </h2>
           <p className="mt-4 text-muted-foreground text-lg">
-            A complete studio — from intelligent analysis to in-app generation and quality scoring.
+            From intelligent analysis to multi-model generation, credits, and your own API keys.
           </p>
         </div>
 
@@ -302,7 +327,7 @@ export default function LandingPage() {
         <div className="container mx-auto max-w-6xl px-4 md:px-6 py-20 md:py-28">
           <div className="text-center max-w-2xl mx-auto mb-14">
             <h2 className="font-headline text-3xl sm:text-4xl font-bold tracking-tight">
-              From idea to image in three steps
+              From idea to image — or video — in three steps
             </h2>
             <p className="mt-4 text-muted-foreground text-lg">
               No prompt-engineering expertise required. PromptStudio does the heavy lifting.
@@ -331,24 +356,25 @@ export default function LandingPage() {
 
       {/* ─── Models ───────────────────────────────────────────── */}
       <section id="models" className="container mx-auto max-w-6xl px-4 md:px-6 py-20 md:py-28">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
+        <div className="grid lg:grid-cols-2 gap-12 items-start">
           <div>
             <div className="inline-flex items-center gap-2 text-xs font-medium text-primary bg-primary/10 border border-primary/20 px-3 py-1.5 rounded-full mb-5">
-              <Cpu className="w-3.5 h-3.5" /> Six models, one interface
+              <Cpu className="w-3.5 h-3.5" /> 9 image models · 2 video models · 3 providers
             </div>
             <h2 className="font-headline text-3xl sm:text-4xl font-bold tracking-tight">
-              Powered by the best AI models — with automatic fallback
+              A real multi-model fleet — pick up to 4 and let them compete
             </h2>
             <p className="mt-4 text-muted-foreground text-lg leading-relaxed">
-              Google Gemini 2.5 Flash runs by default. Add an NVIDIA NIM key to unlock DeepSeek,
-              Qwen, GLM, Kimi, and GPT-OSS. If a model is slow or unavailable, PromptStudio
-              seamlessly falls back to the next one so you always get a result.
+              Image generation runs across NVIDIA, Cloudflare Workers AI, and Hugging Face.
+              Video runs on Wan 2.2 and HunyuanVideo. The prompt engine itself is powered by
+              Google Gemini 2.5 Flash.
             </p>
             <ul className="mt-6 space-y-3">
               {[
-                "Per-user rate limiting keeps costs predictable",
-                "Hard request deadlines return clean errors, never hangs",
-                "Every generation logged for usage analytics",
+                "Select up to 4 image models — all generate in parallel",
+                "Video prompts auto-adapted with motion + camera language",
+                "Bring your own keys and generate on your own quota",
+                "10 free daily credits, auto-refunded if a provider fails",
               ].map((item) => (
                 <li key={item} className="flex items-start gap-3 text-sm">
                   <span className="mt-0.5 w-5 h-5 rounded-full bg-primary/15 flex items-center justify-center shrink-0">
@@ -360,28 +386,36 @@ export default function LandingPage() {
             </ul>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            {[
-              "Gemini 2.5 Flash",
-              "DeepSeek V3.2",
-              "Qwen 3.5",
-              "GLM 4.7",
-              "Kimi K2",
-              "GPT-OSS 120B",
-            ].map((m, i) => (
-              <div
-                key={m}
-                className="card-hover rounded-xl border border-border bg-card p-5 flex items-center gap-3"
-              >
-                <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-primary-foreground shrink-0">
-                  <Cpu className="w-4 h-4" />
+          <div className="space-y-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+              <ImageIcon className="w-3.5 h-3.5 text-primary" /> Image models
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {IMAGE_MODELS.map((m, i) => (
+                <div key={`${m.name}-${i}`} className="card-hover rounded-xl border border-border bg-card p-3.5">
+                  <p className="font-semibold text-sm truncate">{m.name}</p>
+                  <p className="text-[11px] text-muted-foreground">{m.provider}</p>
+                  <span className="mt-1.5 inline-block text-[10px] font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                    {m.tag}
+                  </span>
                 </div>
-                <div className="min-w-0">
-                  <p className="font-semibold text-sm truncate">{m}</p>
-                  <p className="text-[11px] text-muted-foreground">{i === 0 ? "Default" : "NVIDIA NIM"}</p>
+              ))}
+            </div>
+
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2 pt-2">
+              <Film className="w-3.5 h-3.5 text-primary" /> Video models
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              {VIDEO_MODELS.map((m) => (
+                <div key={m.name} className="card-hover rounded-xl border border-border bg-card p-3.5">
+                  <p className="font-semibold text-sm truncate">{m.name}</p>
+                  <p className="text-[11px] text-muted-foreground">{m.provider}</p>
+                  <span className="mt-1.5 inline-block text-[10px] font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                    {m.tag}
+                  </span>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -393,10 +427,10 @@ export default function LandingPage() {
           <div className="relative">
             <Logo size={56} className="mx-auto rounded-2xl shadow-lg shadow-primary/20 mb-6" />
             <h2 className="font-headline text-3xl sm:text-4xl font-bold tracking-tight max-w-2xl mx-auto">
-              Ready to create prompts that actually work?
+              Ready to create images and videos that actually impress?
             </h2>
             <p className="mt-4 text-muted-foreground text-lg max-w-xl mx-auto">
-              Join PromptStudio and turn your next idea into gallery-worthy visuals in seconds.
+              Sign in with Google, get 10 free credits every day, and let the models compete for your best shot.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
               <Button asChild size="lg" className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground hover:opacity-90 shadow-lg shadow-primary/20">
@@ -421,10 +455,11 @@ export default function LandingPage() {
           <div className="flex items-center gap-2.5">
             <Logo size={28} className="rounded-lg" />
             <span className="font-semibold text-sm">PromptStudio</span>
-            <span className="text-xs text-muted-foreground">· Content to Image Prompt Generator</span>
+            <span className="text-xs text-muted-foreground">· Prompts · Images · Video</span>
           </div>
           <div className="flex items-center gap-6 text-sm text-muted-foreground">
             <a href="#features" className="hover:text-foreground transition-colors">Features</a>
+            <a href="#models" className="hover:text-foreground transition-colors">Models</a>
             <Link href="/login" className="hover:text-foreground transition-colors">Sign In</Link>
             <Link href="/register" className="hover:text-foreground transition-colors">Get Started</Link>
           </div>
