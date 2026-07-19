@@ -20,13 +20,23 @@ function platformLabel(p: string): string {
   return p;
 }
 
-function downloadImage(img: GalleryImage) {
-  const a = document.createElement("a");
-  a.href = img.dataUri;
-  a.download = `promptstudio-${img.platform}-${img.id.slice(0, 8)}.jpg`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
+async function downloadImage(img: GalleryImage) {
+  const filename = `promptstudio-${img.platform || "image"}-${img.id.slice(0, 8)}.jpg`;
+  try {
+    // Works for both base64 data URIs and cross-origin Blob URLs.
+    const resp = await fetch(img.dataUri);
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch {
+    window.open(img.dataUri, "_blank");
+  }
 }
 
 export function ImageGallery({
@@ -34,7 +44,7 @@ export function ImageGallery({
 }: {
   onReusePrompt?: (prompt: string) => void;
 }) {
-  const { images, removeImage, clear, max } = useImageGallery();
+  const { images, removeImage, clear, max, serverMode } = useImageGallery();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -69,7 +79,7 @@ export function ImageGallery({
             <Images className="w-5 h-5 text-primary" />
             My Gallery
             <span className="text-xs font-normal text-muted-foreground">
-              {images.length}/{max} recent images
+              {serverMode ? `${images.length} saved images` : `${images.length}/${max} recent images`}
             </span>
           </DialogTitle>
         </DialogHeader>
@@ -164,7 +174,9 @@ export function ImageGallery({
 
             <div className="flex items-center justify-between pt-2 border-t border-border/50">
               <p className="text-xs text-muted-foreground">
-                Stored locally on this device. Newest {max} kept.
+                {serverMode
+                  ? "Synced to your account — available on any device."
+                  : `Stored locally on this device. Newest ${max} kept.`}
               </p>
               <Button
                 variant="ghost"

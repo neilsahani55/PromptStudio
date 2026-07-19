@@ -62,6 +62,16 @@ async function init(): Promise<void> {
           duration_ms INTEGER DEFAULT 0,
           created_at TEXT DEFAULT (datetime('now'))
         )`,
+        `CREATE TABLE IF NOT EXISTS gallery_images (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+          url TEXT NOT NULL,
+          prompt TEXT,
+          platform TEXT,
+          model TEXT,
+          aspect_ratio TEXT,
+          created_at TEXT DEFAULT (datetime('now'))
+        )`,
       ],
       'write'
     );
