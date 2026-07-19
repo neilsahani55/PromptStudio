@@ -34,7 +34,8 @@ if (process.env.NVIDIA_API_KEY) {
   plugins.push(
     openAI({
       apiKey: process.env.NVIDIA_API_KEY,
-      baseURL: 'https://integrate.api.nvidia.com/v1',
+      // Honor the documented override; default to NVIDIA's standard NIM endpoint.
+      baseURL: process.env.NVIDIA_NIM_BASE_URL || 'https://integrate.api.nvidia.com/v1',
       models: [
         {
           name: 'openai/gpt-oss-120b',

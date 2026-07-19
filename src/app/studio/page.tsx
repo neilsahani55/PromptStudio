@@ -203,16 +203,13 @@ export default function PromptStudioPage() {
   // Watch content length for InputHelpers
   const contentLength = form.watch("content")?.length || 0;
 
-  // Handle Model Strategy Change
+  // Handle Model Strategy Change.
+  // NOTE: the NVIDIA-hosted text models (deepseek/qwen/glm/kimi/…) currently
+  // return 404 from NVIDIA's endpoint, so every strategy defaults to Gemini
+  // (which is reliable). NVIDIA models remain manually selectable in the
+  // dropdown but may fail until NVIDIA updates the ids / your key gains access.
   useEffect(() => {
-    if (modelStrategy === 'fast') {
-      form.setValue('model', 'googleai/gemini-2.5-flash');
-    } else if (modelStrategy === 'quality') {
-      form.setValue('model', 'openai/deepseek-ai/deepseek-v3.2');
-    } else {
-      // Auto: Default to Gemini for now, or could be dynamic
-      form.setValue('model', 'googleai/gemini-2.5-flash');
-    }
+    form.setValue('model', 'googleai/gemini-2.5-flash');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modelStrategy]);
 

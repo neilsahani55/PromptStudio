@@ -65,11 +65,10 @@ export async function getRateLimitStatus() {
 }
 
 // ─── FALLBACK MODEL CHAIN ───────────────────────────────────────
-// If selected model fails, automatically try the next model in the chain
-// Only include models that are actually available (have API keys configured)
-const FALLBACK_CHAIN = AVAILABLE_MODELS
-  .filter(m => m.id === 'googleai/gemini-2.5-flash' || m.id === 'openai/deepseek-ai/deepseek-v3.2')
-  .map(m => m.id);
+// If the selected model fails, fall back to Gemini — the reliable default.
+// (NVIDIA-hosted text models currently 404 from NVIDIA's endpoint, so keeping
+// them in the chain only wastes time and produces misleading 404 errors.)
+const FALLBACK_CHAIN = ['googleai/gemini-2.5-flash'];
 
 const MAX_RETRIES = 0;
 const INITIAL_RETRY_DELAY_MS = 0;
@@ -110,7 +109,7 @@ function categorizeError(error: unknown): { message: string; type: string } {
   const msg = error instanceof Error ? error.message : String(error);
 
   if (msg.includes('404') || msg.includes('not found')) {
-    return { message: 'The selected AI model is currently unavailable. Try a different model.', type: 'model_unavailable' };
+    return { message: 'That AI model is unavailable (the NVIDIA-hosted models are currently returning 404). Switch to "Gemini 2.5 Flash" in the model selector.', type: 'model_unavailable' };
   }
   if (msg.includes('429') || msg.includes('rate limit') || msg.includes('quota')) {
     return { message: 'Rate limit reached. Please wait a moment and try again.', type: 'rate_limited' };
