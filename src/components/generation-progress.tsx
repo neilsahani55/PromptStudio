@@ -33,12 +33,36 @@ export function GenerationProgress({ stage, elapsed }: GenerationProgressProps) 
   }, []);
 
   const currentIndex = STAGES.findIndex(s => s.id === stage);
+  const isComplete = stage === 'complete';
+
+  // Smooth, live-feeling progress. Eases asymptotically toward ~95% over the
+  // expected duration (so it keeps moving even on long requests) and snaps to
+  // 100% the moment generation actually completes.
+  const percent = isComplete
+    ? 100
+    : Math.min(95, Math.round((1 - Math.exp(-elapsed / 11000)) * 100));
 
   return (
     <div className="flex flex-col items-center justify-center gap-6 text-center p-12 animate-in fade-in zoom-in-95 duration-500">
       <div className="pulse-glow rounded-full">
         <div className="p-4 bg-gradient-to-br from-primary to-accent rounded-full shadow-lg">
           <Loader2 className="h-8 w-8 animate-spin text-white" />
+        </div>
+      </div>
+
+      {/* Live progress bar */}
+      <div className="w-full max-w-sm">
+        <div className="flex justify-between items-center text-xs mb-1.5">
+          <span className="font-medium text-foreground">
+            {isComplete ? 'Finalizing…' : (STAGES[currentIndex]?.label ?? 'Working…')}
+          </span>
+          <span className="tabular-nums text-muted-foreground">{percent}%</span>
+        </div>
+        <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-primary to-accent transition-all duration-500 ease-out"
+            style={{ width: `${percent}%` }}
+          />
         </div>
       </div>
 
