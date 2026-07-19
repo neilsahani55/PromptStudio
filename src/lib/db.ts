@@ -100,6 +100,15 @@ async function init(): Promise<void> {
       ALTER TABLE usage_log ADD COLUMN IF NOT EXISTS user_name TEXT;
       ALTER TABLE activity_log ADD COLUMN IF NOT EXISTS user_name TEXT;
       ALTER TABLE gallery_images ADD COLUMN IF NOT EXISTS user_name TEXT;
+      -- Lock down Supabase's auto-generated Data API (PostgREST): RLS with no
+      -- policies = deny-by-default for anon/authenticated API access. Our own
+      -- direct Postgres connection owns the tables and is unaffected.
+      ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+      ALTER TABLE feedback ENABLE ROW LEVEL SECURITY;
+      ALTER TABLE activity_log ENABLE ROW LEVEL SECURITY;
+      ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
+      ALTER TABLE usage_log ENABLE ROW LEVEL SECURITY;
+      ALTER TABLE gallery_images ENABLE ROW LEVEL SECURITY;
     `);
 
     // Backfill user_name on rows created before the column existed.
