@@ -31,9 +31,7 @@ export default function RootLayout({
       var valid = ['light','dark','ocean-blue','forest-green','sunset','rose','midnight','lavender','charcoal','emerald'];
       var darkFeel = ['dark','forest-green','midnight','charcoal'];
       var stored = localStorage.getItem('theme');
-      var theme = valid.indexOf(stored) >= 0
-        ? stored
-        : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      var theme = valid.indexOf(stored) >= 0 ? stored : 'dark';
       document.documentElement.setAttribute('data-theme', theme);
       if (darkFeel.indexOf(theme) >= 0) {
         document.documentElement.classList.add('dark');

@@ -69,17 +69,12 @@ const VALID_THEMES = new Set<string>(THEMES.map((t) => t.id));
 
 function parseTheme(value: string | null): Theme {
   if (value && VALID_THEMES.has(value)) return value as Theme;
-  if (
-    typeof window !== "undefined" &&
-    window.matchMedia("(prefers-color-scheme: dark)").matches
-  ) {
-    return "dark";
-  }
-  return "light";
+  // Default to dark for first-time visitors (no saved preference).
+  return "dark";
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("light");
+  const [theme, setThemeState] = useState<Theme>("dark");
 
   useEffect(() => {
     const initial = parseTheme(localStorage.getItem("theme"));
