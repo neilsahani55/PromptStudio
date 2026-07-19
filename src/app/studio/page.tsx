@@ -32,6 +32,7 @@ import {
   getAnalysisFromImage,
   getAvailableModelsAction,
   getRateLimitStatus,
+  enhanceInputText,
 } from "@/app/actions";
 import { detectImageType, imageTypeLabel } from "@/ai/utils/auto-detect";
 import { GenerationProgress, GenerationStage } from "@/components/generation-progress";
@@ -175,6 +176,7 @@ export default function PromptStudioPage() {
   const [modelStrategy, setModelStrategy] = useState<ModelStrategy>('auto');
   const [isFixing, setIsFixing] = useState(false);
   const [isRefining, setIsRefining] = useState(false);
+  const [isEnhancing, setIsEnhancing] = useState(false);
   const [availableModels, setAvailableModels] = useState<{id: string, label: string}[]>([]);
 
   useEffect(() => {
@@ -584,6 +586,28 @@ export default function PromptStudioPage() {
     }
   };
 
+  const handleEnhance = async () => {
+    const content = form.getValues("content");
+    if (!content || content.trim().length < 3) {
+      toast({ title: "Nothing to enhance yet", description: "Write a few words first, then tap Enhance." });
+      return;
+    }
+    setIsEnhancing(true);
+    try {
+      const res = await enhanceInputText(content, form.getValues("model"));
+      if (res.success) {
+        form.setValue("content", res.data, { shouldValidate: true, shouldDirty: true });
+        toast({ title: "Prompt enhanced ✨", description: "Expanded your idea into a richer visual brief." });
+      } else {
+        toast({ variant: "destructive", title: "Enhance failed", description: res.error });
+      }
+    } catch {
+      toast({ variant: "destructive", title: "Enhance failed", description: "Please try again." });
+    } finally {
+      setIsEnhancing(false);
+    }
+  };
+
   const handleRefine = async (instruction: string) => {
     setIsRefining(true);
     try {
@@ -671,10 +695,28 @@ export default function PromptStudioPage() {
                         name="content"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-base font-semibold flex items-center gap-2">
-                              <FileText className="w-4 h-4 text-primary" />
-                              Your content
-                            </FormLabel>
+                            <div className="flex items-center justify-between gap-2">
+                              <FormLabel className="text-base font-semibold flex items-center gap-2">
+                                <FileText className="w-4 h-4 text-primary" />
+                                Your content
+                              </FormLabel>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleEnhance}
+                                disabled={isEnhancing || loading || isFixing || isRefining}
+                                className="h-7 gap-1.5 text-primary hover:text-primary hover:bg-primary/10 -mr-1"
+                                title="Expand your idea into a richer visual brief with AI"
+                              >
+                                {isEnhancing ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <Sparkles className="w-3.5 h-3.5" />
+                                )}
+                                {isEnhancing ? "Enhancing..." : "Enhance"}
+                              </Button>
+                            </div>
                             <FormControl>
                               <div className="relative">
                                 <Textarea

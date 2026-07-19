@@ -7,7 +7,7 @@
 import { headers } from 'next/headers';
 import { generateImagePromptsFromText } from "@/ai/flows/generate-image-prompts-from-text";
 import { generateImagePromptsFromScreenshot } from "@/ai/flows/generate-image-prompts-from-screenshot";
-import { AVAILABLE_MODELS } from "@/ai/genkit";
+import { AVAILABLE_MODELS, ai } from "@/ai/genkit";
 
 import { logFeedback, FeedbackEntry } from '@/ai/utils/feedback-store';
 import { generationLimiter } from '@/ai/utils/rate-limiter';
@@ -341,6 +341,51 @@ export async function getAnalysisFromImage(
       };
     }
 
+    const { message, type } = categorizeError(e);
+    return { success: false, error: message, errorType: type };
+  }
+}
+
+/**
+ * One-click prompt enhancer: expands a short/vague idea into a vivid, concrete
+ * visual brief before generation. Uses the fast default model, with a hard
+ * deadline so it never hangs the request.
+ */
+export async function enhanceInputText(
+  text: string,
+  model?: string
+): Promise<ActionResponse<string>> {
+  const trimmed = (text || '').trim();
+  if (trimmed.length < 3) {
+    return { success: false, error: 'Write a few words first, then enhance.' };
+  }
+  if (trimmed.length > 4000) {
+    return { success: false, error: 'That input is already very detailed — enhance works best on shorter ideas.' };
+  }
+
+  const instruction =
+    `You are a visual art director. Rewrite the user's idea into a single vivid, ` +
+    `concrete visual brief for AI image generation. Expand vague ideas with specific ` +
+    `subject, setting, mood, lighting, and style details. Keep it to 2-4 sentences of ` +
+    `descriptive prose — no lists, no preamble, no surrounding quotes.\n\n` +
+    `User idea: ${trimmed}\n\nEnhanced visual brief:`;
+
+  const DEADLINE_MS = 25_000;
+  const deadline = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error('DEADLINE_EXCEEDED')), DEADLINE_MS)
+  );
+
+  try {
+    const res = await Promise.race([
+      ai.generate({ model: model || 'googleai/gemini-2.5-flash', prompt: instruction }),
+      deadline,
+    ]);
+    const out = (res.text || '').trim().replace(/^["']|["']$/g, '');
+    if (!out) {
+      return { success: false, error: 'The model returned an empty result. Please try again.' };
+    }
+    return { success: true, data: out };
+  } catch (e) {
     const { message, type } = categorizeError(e);
     return { success: false, error: message, errorType: type };
   }
