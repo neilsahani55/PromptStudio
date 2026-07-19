@@ -108,7 +108,9 @@ export async function POST(req: NextRequest) {
   // tighter slice so there is time left to fall back to Google on a timeout.
   const overallDeadline = Date.now() + 56_000;
   const hasGoogle = !!process.env.GOOGLE_GENAI_API_KEY;
-  const nvidiaDeadline = Date.now() + (hasGoogle ? 38_000 : 55_000);
+  // NVIDIA free-tier is often too slow; when Google is available, give NVIDIA a
+  // short window then fall back quickly to the (fast) Google image models.
+  const nvidiaDeadline = Date.now() + (hasGoogle ? 22_000 : 55_000);
   let promptForFallback = '';
   try {
     const rawBody = await req.json();
