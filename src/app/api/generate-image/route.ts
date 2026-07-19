@@ -15,24 +15,23 @@ const NVIDIA_KEY = process.env.NVIDIA_API_KEY;
 const NVIDIA_KEY_FALLBACK = process.env.NVIDIA_API_KEY_FALLBACK;
 const NVIDIA_KEYS = [NVIDIA_KEY, NVIDIA_KEY_FALLBACK].filter(Boolean) as string[];
 
-// Direct endpoints for NVIDIA-hosted models.
-// Defaults target models typically available on NVIDIA NIM free tier:
-//   - Flux Schnell (4-step distilled, free-tier friendly)
-//   - Stable Diffusion 3.5 Large (current SD flagship)
-// Override with env vars if your NVIDIA account has access to a different endpoint:
-//   NVIDIA_FLUX_URL=https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-dev
-//   NVIDIA_SD_URL=https://ai.api.nvidia.com/v1/genai/stabilityai/stable-diffusion-3-medium
+// Direct endpoints for NVIDIA-hosted image models.
+// Verified live (July 2026) against ai.api.nvidia.com with a standard key:
+//   - black-forest-labs/flux.2-klein-4b  → WORKS (fast, distilled)
+//   - black-forest-labs/flux.1-dev       → WORKS (high quality, steps>=~15)
+//   - black-forest-labs/flux.1-schnell   → BROKEN (backend function errors)
+//   - stabilityai/* (SD 3.5 / SD3 / SDXL)→ REMOVED by NVIDIA (404 function not found)
+// Override with env vars if NVIDIA reshuffles the catalog again.
 const FLUX_URL =
   process.env.NVIDIA_FLUX_URL ||
-  'https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-schnell';
+  'https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.2-klein-4b';
+// "sd35" is kept as the API's model name for compatibility, but NVIDIA removed
+// all Stable Diffusion endpoints — it now maps to FLUX.1-dev (the HQ option).
 const SD_URL =
   process.env.NVIDIA_SD_URL ||
-  'https://ai.api.nvidia.com/v1/genai/stabilityai/stable-diffusion-3-5-large';
-// Qwen-Image — excels at rendering text inside images. Endpoint may vary by
-// account; override with NVIDIA_QWEN_URL if the default 404s for your key.
-const QWEN_URL =
-  process.env.NVIDIA_QWEN_URL ||
-  'https://ai.api.nvidia.com/v1/genai/qwen/qwen-image';
+  'https://ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-dev';
+// Qwen-Image was also removed from NVIDIA's catalog — map to the fast Flux.
+const QWEN_URL = process.env.NVIDIA_QWEN_URL || FLUX_URL;
 
 // Base negative prompt for SD3 to prevent generic stock look
 const SD_BASE_NEGATIVE = "stock photo, watermark, amateur, blurry, distorted, low quality, grainy, text, signature, frame, border, disembodied hands, messy background";
@@ -143,6 +142,10 @@ export async function POST(req: NextRequest) {
           'Authorization': `Bearer ${key}`,
           'Content-Type': 'application/json',
           'Accept': 'application/json',
+          // Ask NVIDIA to hold at most 45s, then return 202 + NVCF-REQID. The
+          // client polls /api/generate-image/status with that id, so slow
+          // generations aren't bound by this function's 60s limit.
+          'NVCF-POLL-SECONDS': '45',
         },
         body: JSON.stringify(payload),
         signal: controller.signal,
@@ -391,50 +394,19 @@ function buildNimRequest(
     SD_BASE_NEGATIVE
   ].filter(Boolean).join(", ");
 
-  if (model === 'flux') {
-    // Flux Schnell is a 4-step distilled model — max 4 steps accepted by NIM.
-    // Flux Dev / Pro support 20-50 steps; 30 is a good default for quality.
-    const isSchnell = FLUX_URL.toLowerCase().includes('schnell');
-    return {
-      url: FLUX_URL,
-      key: NVIDIA_KEY,
-      payload: {
-        prompt: opts.prompt,
-        width,
-        height,
-        steps: isSchnell ? 4 : 30,
-        seed: opts.seed,
-      },
-    };
-  }
-
-  if (model === 'qwen') {
-    // Qwen-Image: aspect-ratio based, strong text-in-image rendering.
-    return {
-      url: QWEN_URL,
-      key: NVIDIA_KEY,
-      payload: {
-        prompt: opts.prompt,
-        aspect_ratio: normalizeSdAspectRatio(opts.aspectRatio),
-        seed: opts.seed ?? 0,
-        negative_prompt: combinedNegative,
-        cfg_scale: 4.0,
-        steps: 30,
-      },
-    };
-  }
-
-
+  // All live NVIDIA Flux endpoints take width/height (verified). Distilled
+  // variants (klein / schnell) want ~4 steps; dev wants 20-30.
+  const url = model === 'sd35' ? SD_URL : model === 'qwen' ? QWEN_URL : FLUX_URL;
+  const isDistilled = /klein|schnell|turbo/i.test(url);
   return {
-    url: SD_URL,
+    url,
     key: NVIDIA_KEY,
     payload: {
       prompt: opts.prompt,
-      aspect_ratio: normalizeSdAspectRatio(opts.aspectRatio),
-      seed: opts.seed ?? 0,
-      negative_prompt: combinedNegative,
-      cfg_scale: 7.0, // Balanced guidance
-      steps: 30     // 30 steps: near-40 quality, meaningfully faster (fits 60s budget)
+      width,
+      height,
+      steps: isDistilled ? 4 : 28,
+      seed: opts.seed ?? Math.floor(Math.random() * 1_000_000),
     },
   };
 }

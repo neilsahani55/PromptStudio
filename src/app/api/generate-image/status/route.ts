@@ -26,7 +26,12 @@ export async function GET(req: NextRequest) {
     const timer = setTimeout(() => controller.abort(), 50_000);
     const res = await fetch(statusUrl, {
       method: 'GET',
-      headers: { Authorization: `Bearer ${NVIDIA_KEY}`, Accept: 'application/json' },
+      headers: {
+        Authorization: `Bearer ${NVIDIA_KEY}`,
+        Accept: 'application/json',
+        // Long-poll NVCF up to 20s per round trip (stays well under our 60s).
+        'NVCF-POLL-SECONDS': '20',
+      },
       signal: controller.signal,
     }).finally(() => clearTimeout(timer));
 

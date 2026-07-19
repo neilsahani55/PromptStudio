@@ -16,63 +16,68 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { QuickFixChips, FixType } from "@/components/quick-fix-chips";
 import { useImageGallery } from "@/hooks/use-image-gallery";
 
-// Browser-side image generation via Pollinations (free, keyless, Flux-based).
-// The browser loads the image directly from Pollinations — there is NO Vercel
-// serverless function in the path, so it is NOT subject to the 60s limit and
-// can take as long as the model needs.
-const POLLINATIONS_MODEL: Record<string, string> = {
-  flux: 'flux',
-  sd35: 'turbo',
-  qwen: 'flux-realism',
-};
-
-function pollinationsDims(ar: string): { width: number; height: number } {
-  const m = ar.match(/^(\d+):(\d+)$/);
-  if (!m) return { width: 1024, height: 1024 };
-  const r = parseInt(m[1], 10) / parseInt(m[2], 10);
-  if (r > 1.2) return { width: 1280, height: 720 };
-  if (r < 0.85) return { width: 720, height: 1280 };
-  return { width: 1024, height: 1024 };
+// NVIDIA image generation via our API route. When NVIDIA can't finish within
+// the route's window it returns { pending, reqId }; we then poll the status
+// endpoint — each poll is its own short request, so total generation time is
+// not limited by any single serverless invocation's 60s cap.
+async function pollForImage(reqId: string): Promise<{ url: string | null; base64: string | null }> {
+  const deadline = Date.now() + 240_000; // up to ~4 minutes total
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 2500));
+    let pres: Response;
+    try {
+      pres = await fetch(`/api/generate-image/status?reqId=${encodeURIComponent(reqId)}`, {
+        credentials: 'same-origin',
+      });
+    } catch {
+      continue; // transient network blip — keep polling
+    }
+    let pdata: any = null;
+    try { pdata = JSON.parse(await pres.text()); } catch { continue; }
+    if (pdata?.pending) continue;
+    if (!pres.ok || pdata?.error) {
+      const parts = [pdata?.error || 'Generation failed', pdata?.detail, pdata?.hint].filter(Boolean);
+      throw new Error(parts.join(' — '));
+    }
+    if (pdata?.image) return pdata.image;
+  }
+  throw new Error('Image generation timed out after 4 minutes. Try the fast Flux model or a simpler prompt.');
 }
 
-function loadImageEl(url: string, timeoutMs = 180_000): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const img = document.createElement('img');
-    const timer = setTimeout(() => {
-      img.src = '';
-      reject(new Error('Image generation timed out (over 3 minutes).'));
-    }, timeoutMs);
-    img.onload = () => { clearTimeout(timer); resolve(); };
-    img.onerror = () => { clearTimeout(timer); reject(new Error('Image generation failed. Try again or simplify the prompt.')); };
-    img.src = url;
-  });
-}
-
-async function generateViaPollinations(
+// Calls the NVIDIA-backed API route and resolves the async-polling path.
+async function generateViaNvidia(
+  model: string,
   prompt: string,
   aspectRatio: string,
-  seed: number,
-  model = 'flux'
-): Promise<{ url: string; dataUri: string }> {
-  const { width, height } = pollinationsDims(aspectRatio);
-  const clean = prompt.slice(0, 1500);
-  const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(clean)}?width=${width}&height=${height}&model=${model}&nologo=true&seed=${seed}`;
-  await loadImageEl(url); // waits for generation — no 60s cap
-  // Fetch to base64 for permanent gallery storage (best-effort; Pollinations is CORS-enabled).
-  let dataUri = url;
-  try {
-    const resp = await fetch(url);
-    const blob = await resp.blob();
-    dataUri = await new Promise<string>((res, rej) => {
-      const fr = new FileReader();
-      fr.onloadend = () => res(fr.result as string);
-      fr.onerror = () => rej(new Error('read failed'));
-      fr.readAsDataURL(blob);
-    });
-  } catch {
-    /* keep the URL if the fetch is blocked */
+  stylePreset?: string
+): Promise<{ imageUrl: string; usedModel: string }> {
+  const res = await fetch('/api/generate-image', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model, prompt, aspectRatio, stylePreset }),
+  });
+  const text = await res.text();
+  let data: any = null;
+  try { data = JSON.parse(text); } catch { throw new Error(`Server Error (${res.status})`); }
+
+  if (res.ok && data?.pending && data?.reqId) {
+    const image = await pollForImage(data.reqId);
+    data = { ...data, image };
   }
-  return { url, dataUri };
+
+  if (!res.ok || !data?.image) {
+    const toStr = (v: unknown): string | null => {
+      if (v == null) return null;
+      if (typeof v === 'string') return v;
+      try { return JSON.stringify(v); } catch { return String(v); }
+    };
+    const parts = [toStr(data?.error) || 'Generation failed', toStr(data?.detail), toStr(data?.hint)].filter(Boolean);
+    throw new Error(parts.join(' — '));
+  }
+
+  const imageUrl = data.image.url || data.image.base64;
+  if (!imageUrl) throw new Error('No image data received');
+  return { imageUrl, usedModel: data.model || model };
 }
 import { styleProfiles, BrandStyle } from "@/ai/utils/style-profiles";
 
@@ -304,7 +309,7 @@ function PromptDisplay({
                 ) : (
                     <>
                         <ImageIcon className="w-4 h-4 mr-2" />
-                        Generate with {platform === 'flux' ? 'Flux' : 'SD 3.5'}
+                        Generate with {platform === 'flux' ? 'Flux (Fast)' : 'Flux Dev (HQ)'}
                     </>
                 )}
             </Button>
@@ -510,26 +515,24 @@ function MultiPlatformPrompt({
   const [genErrors, setGenErrors] = useState<Record<string, string | null>>({});
 
   // ─── Image model comparison (Flux vs SD 3.5) ───────────────────────────────
-  type CompareModel = 'flux' | 'sd35' | 'qwen';
-  const COMPARE_MODELS: CompareModel[] = ['flux', 'sd35', 'qwen'];
+  type CompareModel = 'flux' | 'sd35';
+  const COMPARE_MODELS: CompareModel[] = ['flux', 'sd35'];
   const compareLabel = (m: CompareModel) =>
-    m === 'flux' ? 'Flux' : m === 'qwen' ? 'Qwen-Image' : 'Stable Diffusion 3.5';
+    m === 'flux' ? 'FLUX.2 Klein (Fast)' : 'FLUX.1 Dev (HQ)';
   const [compareOpen, setCompareOpen] = useState(false);
-  const [compareState, setCompareState] = useState<Record<CompareModel, 'idle' | 'loading' | 'done' | 'error'>>({ flux: 'idle', sd35: 'idle', qwen: 'idle' });
-  const [compareImages, setCompareImages] = useState<Record<CompareModel, string | null>>({ flux: null, sd35: null, qwen: null });
-  const [compareErrors, setCompareErrors] = useState<Record<CompareModel, string | null>>({ flux: null, sd35: null, qwen: null });
+  const [compareState, setCompareState] = useState<Record<CompareModel, 'idle' | 'loading' | 'done' | 'error'>>({ flux: 'idle', sd35: 'idle' });
+  const [compareImages, setCompareImages] = useState<Record<CompareModel, string | null>>({ flux: null, sd35: null });
+  const [compareErrors, setCompareErrors] = useState<Record<CompareModel, string | null>>({ flux: null, sd35: null });
 
   const generateForCompare = async (model: CompareModel, prompt: string) => {
     setCompareState(prev => ({ ...prev, [model]: 'loading' }));
     setCompareErrors(prev => ({ ...prev, [model]: null }));
     const aspectRatio = qualityMetrics?.suggestedAspectRatio || '16:9';
-    const seed = Math.floor(Math.random() * 1_000_000);
     try {
-      const pModel = POLLINATIONS_MODEL[model] || 'flux';
-      const { url, dataUri } = await generateViaPollinations(prompt, aspectRatio, seed, pModel);
-      setCompareImages(prev => ({ ...prev, [model]: url }));
+      const { imageUrl, usedModel } = await generateViaNvidia(model, prompt, aspectRatio, selectedStyle);
+      setCompareImages(prev => ({ ...prev, [model]: imageUrl }));
       setCompareState(prev => ({ ...prev, [model]: 'done' }));
-      addImage({ dataUri, prompt, platform: model, model: pModel, aspectRatio });
+      addImage({ dataUri: imageUrl, prompt, platform: model, model: usedModel, aspectRatio });
     } catch (e: any) {
       setCompareErrors(prev => ({ ...prev, [model]: e?.message || 'Generation failed' }));
       setCompareState(prev => ({ ...prev, [model]: 'error' }));
@@ -539,7 +542,7 @@ function MultiPlatformPrompt({
   const handleCompareModels = (prompt: string) => {
     if (!prompt) return;
     setCompareOpen(true);
-    setCompareImages({ flux: null, sd35: null, qwen: null });
+    setCompareImages({ flux: null, sd35: null });
     // Fire all in parallel — each hits its own serverless function/time budget.
     COMPARE_MODELS.forEach((m) => generateForCompare(m, prompt));
   };
@@ -552,18 +555,19 @@ function MultiPlatformPrompt({
 
     try {
         const aspectRatio = qualityMetrics?.suggestedAspectRatio || '16:9';
-        const seed = Math.floor(Math.random() * 1_000_000);
-        const { url: imageUrl, dataUri } = await generateViaPollinations(prompt, aspectRatio, seed, 'flux');
+        // The "flux" tab uses the fast distilled model; other tabs use the HQ one.
+        const model = platform === 'flux' ? 'flux' : 'sd35';
+        const { imageUrl, usedModel } = await generateViaNvidia(model, prompt, aspectRatio, selectedStyle);
 
         setGeneratedImages(prev => ({ ...prev, [platform]: imageUrl }));
         setGenState(prev => ({ ...prev, [platform]: 'done' }));
 
         // Persist to the gallery (base64 for permanence).
-        addImage({ dataUri, prompt, platform, model: 'flux', aspectRatio });
+        addImage({ dataUri: imageUrl, prompt, platform, model: usedModel, aspectRatio });
 
         toast({
             title: "Image Generated!",
-            description: "Created with Flux — runs in your browser, no time limit."
+            description: `Created with ${model === 'flux' ? 'FLUX.2 Klein' : 'FLUX.1 Dev'} on NVIDIA.`
         });
 
     } catch (e: any) {
@@ -888,7 +892,7 @@ function MultiPlatformPrompt({
                     Compare image models
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Generate this prompt on Flux, SD 3.5, and Qwen-Image at once.
+                    Generate this prompt on FLUX.2 Klein (fast) and FLUX.1 Dev (HQ) at once.
                   </p>
                 </div>
                 <Button
@@ -908,7 +912,7 @@ function MultiPlatformPrompt({
               </div>
 
               {compareOpen && (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+                <div className="grid grid-cols-2 gap-3 md:gap-4">
                   {COMPARE_MODELS.map((m) => (
                     <div key={m} className="rounded-xl border border-border bg-card overflow-hidden">
                       <div className="px-3 py-2 border-b border-border/60 bg-muted/40 flex items-center justify-between">
