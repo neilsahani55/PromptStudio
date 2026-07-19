@@ -28,8 +28,18 @@ Built with Next.js 15, React 19, Google Genkit, and NVIDIA NIM.
 | AI orchestration | Google Genkit 1.20 |
 | Models | Gemini 2.5 Flash, NVIDIA NIM-hosted OpenAI-compatible models |
 | Auth | JWT (`jose`), bcryptjs password hashing, middleware-guarded routes |
-| Database | SQLite via `better-sqlite3` (local, file-based) |
+| Database | libSQL — local SQLite file in dev, [Turso](https://turso.tech) in production |
 | Validation | Zod |
+
+### Routes
+
+| Path | Access | Purpose |
+|---|---|---|
+| `/` | Public | Marketing landing page |
+| `/studio` | Authenticated | The prompt-generation studio (the app) |
+| `/login`, `/register` | Public | Auth |
+| `/settings`, `/feedback` | Authenticated | User settings & feedback history |
+| `/admin/*` | Admin only | User management, feedback triage, usage, settings |
 
 ---
 
@@ -72,9 +82,11 @@ See [`.env.example`](.env.example) for the complete template.
 | `NVIDIA_API_KEY_FLUX` |  | In-app Flux image generation |
 | `NVIDIA_API_KEY_SD35` |  | In-app Stable Diffusion 3.5 image generation |
 | `NVIDIA_NIM_BASE_URL` |  | Defaults to `https://integrate.api.nvidia.com/v1` |
+| `TURSO_DATABASE_URL` | prod | libSQL/Turso URL (`libsql://…`). Leave blank in dev to use a local SQLite file. [Sign up](https://turso.tech) |
+| `TURSO_AUTH_TOKEN` | prod | Auth token for the Turso database |
 | `ALLOWED_DEV_ORIGINS` |  | Comma-separated LAN origins for Turbopack dev server |
 
-The app runs with only `AUTH_SECRET` + `GOOGLE_GENAI_API_KEY`. Everything else is opt-in.
+The app runs locally with only `AUTH_SECRET` + `GOOGLE_GENAI_API_KEY` — with the Turso vars blank, the database falls back to a local SQLite file at `data/promptstudio.db`. Everything else is opt-in.
 
 ---
 
@@ -95,8 +107,7 @@ npm run lint         # next lint
 
 ```
 .
-├── data/                       # SQLite database + prompt feedback log (gitignored)
-├── docs/                       # PROJECT_DOCUMENTATION.md + .pdf (full technical reference)
+├── data/                       # Local SQLite database + prompt feedback log (gitignored)
 ├── public/                     # Static assets
 ├── src/
 │   ├── ai/
@@ -107,9 +118,11 @@ npm run lint         # next lint
 │   ├── app/
 │   │   ├── admin/              # Admin panel (users, feedback, settings, usage, stats)
 │   │   ├── api/                # Auth, feedback, admin, image-gen routes
+│   │   ├── studio/             # The prompt-generation studio (authenticated app, /studio)
 │   │   ├── feedback/           # User-facing feedback history
 │   │   ├── login/, register/, settings/
-│   │   ├── layout.tsx, page.tsx
+│   │   ├── layout.tsx          # Root layout (theme + auth providers)
+│   │   ├── page.tsx            # Public marketing landing page (/)
 │   │   └── globals.css         # 10 theme CSS-variable blocks
 │   ├── components/
 │   │   ├── ui/                 # shadcn primitives
@@ -117,11 +130,10 @@ npm run lint         # next lint
 │   │   ├── theme-provider.tsx, theme-palette.tsx
 │   │   └── ...
 │   ├── hooks/                  # use-history, use-feedback-notifications, use-toast
-│   ├── lib/                    # auth, db, utils, types
+│   ├── lib/                    # auth, db (libSQL), utils, types
 │   └── middleware.ts           # Route guards, JWT verification
 ├── .env.example                # Env template (commit this)
 ├── .env.local                  # Your secrets (never commit)
-├── github.txt                  # Step-by-step GitHub + deploy guide
 └── README.md
 ```
 
@@ -129,16 +141,19 @@ npm run lint         # next lint
 
 ## Deployment
 
-**Important**: this app writes to a local SQLite file (`data/promptstudio.db`). That rules out serverless-only platforms (Vercel, Netlify) unless you swap the database. See [`github.txt`](github.txt) for a full decision table plus step-by-step instructions for:
+The database layer uses **libSQL**, so the app deploys cleanly to serverless platforms — the local SQLite file is only a dev convenience. For production, point it at a [Turso](https://turso.tech) database:
 
-| Platform | SQLite works? | Setup time |
+1. Create a Turso database and generate an auth token.
+2. Set `TURSO_DATABASE_URL` (`libsql://…`) and `TURSO_AUTH_TOKEN` in your host's environment.
+3. Set `AUTH_SECRET` and `GOOGLE_GENAI_API_KEY` (plus any optional NVIDIA keys).
+4. Deploy. The schema and default admin are created automatically on first boot.
+
+| Platform | Works? | Notes |
 |---|:---:|---|
-| **Railway** | yes — persistent volume | ~5 min |
-| **Render** | yes — with disk | ~5 min |
-| **Fly.io** | yes — with volume | ~10 min |
-| **Vercel** + Turso (libSQL) | yes — with minor code change | ~15 min |
-| **Vercel / Netlify** (vanilla) | no — SQLite file is wiped on each invocation | — |
-| **Self-hosted VPS** | yes | ~10 min |
+| **Vercel** + Turso | yes | Recommended — zero-config serverless + libSQL |
+| **Netlify** + Turso | yes | Same approach as Vercel |
+| **Railway / Render / Fly.io** | yes | Turso, or a persistent volume for a local SQLite file |
+| **Self-hosted VPS** | yes | Turso or a local file both work |
 
 ---
 
@@ -160,4 +175,4 @@ MIT. Replace this line with your own license if you prefer.
 
 ## Contributing
 
-Issues and pull requests welcome. See [`github.txt`](github.txt) for the full contribution workflow.
+Issues and pull requests welcome. Fork the repo, create a feature branch, run `npm run typecheck` and `npm run lint` before opening a PR against `main`.
