@@ -15,6 +15,36 @@ import { submitFeedback } from "@/app/actions";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { QuickFixChips, FixType } from "@/components/quick-fix-chips";
 import { useImageGallery } from "@/hooks/use-image-gallery";
+
+// When the image API returns an async job ({ pending, reqId }), poll the status
+// endpoint until the image is ready. Each poll is its own short request, so the
+// TOTAL generation time is not limited by any single request's 60s cap.
+async function pollForImage(reqId: string, startData: any): Promise<any> {
+  const deadline = Date.now() + 240_000; // give it up to ~4 minutes
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 3000));
+    let pres: Response;
+    try {
+      pres = await fetch(`/api/generate-image/status?reqId=${encodeURIComponent(reqId)}`, {
+        credentials: "same-origin",
+      });
+    } catch {
+      continue; // transient network blip — keep polling
+    }
+    const ptext = await pres.text();
+    let pdata: any = null;
+    try { pdata = JSON.parse(ptext); } catch { continue; }
+    if (pdata.pending) continue;
+    if (!pres.ok || pdata.error) {
+      const parts = [pdata.error || "Generation failed", pdata.detail, pdata.hint].filter(Boolean);
+      throw new Error(parts.join(" — "));
+    }
+    if (pdata.done && pdata.image) {
+      return { ...startData, image: pdata.image, pending: false };
+    }
+  }
+  throw new Error("Image generation timed out after 4 minutes. Try Flux or a simpler prompt.");
+}
 import { styleProfiles, BrandStyle } from "@/ai/utils/style-profiles";
 
 const copyToClipboard = (text: string, toast: (options: any) => void, onCopySuccess?: () => void) => {
@@ -473,6 +503,9 @@ function MultiPlatformPrompt({
       const text = await res.text();
       let data: any = null;
       try { data = JSON.parse(text); } catch { throw new Error(`Server Error (${res.status})`); }
+      if (res.ok && data?.pending && data?.reqId) {
+        data = await pollForImage(data.reqId, data);
+      }
       if (!res.ok || !data.image) {
         const parts = [data?.error || 'Generation failed', data?.detail, data?.hint].filter(Boolean);
         throw new Error(parts.join(' — '));
@@ -522,6 +555,11 @@ function MultiPlatformPrompt({
           data = JSON.parse(text);
         } catch {
           throw new Error(`Server Error (${res.status})`);
+        }
+
+        // Async job — poll the status endpoint until the image is ready.
+        if (res.ok && data?.pending && data?.reqId) {
+          data = await pollForImage(data.reqId, data);
         }
 
         if (!res.ok || !data.image) {

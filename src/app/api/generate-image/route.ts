@@ -149,41 +149,14 @@ export async function POST(req: NextRequest) {
       }).finally(() => clearTimeout(timer));
     };
 
-    // NVIDIA genai endpoints return 202 + an NVCF-REQID header for longer
-    // generations. Poll the NVCF status endpoint until the image is ready or we
-    // run out of budget. This is what lets complex images take the time they need.
-    const pollNvcf = async (reqId: string, key: string) => {
-      const statusUrl = `https://api.nvcf.nvidia.com/v2/nvcf/pexec/status/${reqId}`;
-      while (deadline - Date.now() > 3_000) {
-        await new Promise((r) => setTimeout(r, 1_500));
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), Math.min(12_000, deadline - Date.now()));
-        const r = await fetch(statusUrl, {
-          method: 'GET',
-          headers: { 'Authorization': `Bearer ${key}`, 'Accept': 'application/json' },
-          signal: controller.signal,
-        }).finally(() => clearTimeout(timer));
-        if (r.status !== 202) return r; // 200 = done (image body), or an error
-      }
-      return Promise.reject(new Error('IMAGE_DEADLINE_EXCEEDED'));
-    };
-
     // Try the primary key; on auth (401/403) or rate-limit (429) failure,
-    // transparently retry with the fallback key (if configured). Then resolve
-    // any async 202 response by polling NVCF.
+    // transparently retry with the fallback key (if configured).
     const callNim = async (n: typeof nim) => {
       let res = await fetchOnce(n.url, n.payload, NVIDIA_KEYS[0]);
       for (let i = 1; i < NVIDIA_KEYS.length; i++) {
         if (res.ok || (res.status !== 401 && res.status !== 403 && res.status !== 429)) break;
         console.warn(`NVIDIA primary key failed (${res.status}) — retrying with fallback key.`);
         res = await fetchOnce(n.url, n.payload, NVIDIA_KEYS[i]);
-      }
-      if (res.status === 202) {
-        const reqId = res.headers.get('NVCF-REQID') || res.headers.get('nvcf-reqid');
-        if (reqId) {
-          console.warn(`NVIDIA returned 202 — polling NVCF for reqId ${reqId}.`);
-          res = await pollNvcf(reqId, NVIDIA_KEYS[0]);
-        }
       }
       return res;
     };
@@ -200,6 +173,17 @@ export async function POST(req: NextRequest) {
         model = 'flux';
         nim = fluxReq;
         res = await callNim(fluxReq);
+      }
+    }
+
+    // Async job: NVIDIA returned 202 + a request id. Hand it to the client to
+    // poll via /api/generate-image/status, so total generation time is NOT
+    // bound by this request's 60s limit (each poll is its own short request).
+    if (res.status === 202) {
+      const reqId = res.headers.get('NVCF-REQID') || res.headers.get('nvcf-reqid');
+      if (reqId) {
+        console.warn(`NVIDIA returned 202 — handing reqId ${reqId} to client for polling.`);
+        return NextResponse.json({ pending: true, reqId, model, requestedModel });
       }
     }
 
