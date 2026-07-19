@@ -124,7 +124,7 @@ export default function MyFeedbackPage() {
           <div>
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="sm" asChild className="h-8 px-2 -ml-2">
-                <Link href="/">
+                <Link href="/studio">
                   <ArrowLeft className="h-4 w-4 mr-1" />
                   Back
                 </Link>

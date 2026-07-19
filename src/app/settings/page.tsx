@@ -232,7 +232,7 @@ export default function SettingsPage() {
       <div className="max-w-2xl mx-auto p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">
-          <Link href="/">
+          <Link href="/studio">
             <Button variant="ghost" size="icon">
               <ArrowLeft className="h-5 w-5" />
             </Button>

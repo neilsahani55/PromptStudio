@@ -41,7 +41,7 @@ export default function LoginPage() {
     try {
       await login(email.trim(), password);
       // Hard navigation so middleware + layout fully re-initialize with the new cookie
-      window.location.href = "/";
+      window.location.href = "/studio";
     } catch (err) {
       setError(err instanceof Error ? err.message : "Invalid email or password.");
     } finally {

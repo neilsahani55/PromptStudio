@@ -35,6 +35,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Public marketing landing page — visible to everyone, logged in or not.
+  if (pathname === '/') {
+    return NextResponse.next();
+  }
+
   // Allow public paths
   if (publicPaths.some((p) => pathname === p)) {
     const token = request.cookies.get('auth-token')?.value;
@@ -43,7 +48,7 @@ export async function middleware(request: NextRequest) {
         const { payload } = await jwtVerify(token, secret);
         // Don't redirect blocked users — let them see login
         if (payload.status !== 'blocked') {
-          return NextResponse.redirect(new URL('/', request.url));
+          return NextResponse.redirect(new URL('/studio', request.url));
         }
       } catch {
         // Invalid token, let them access login/register

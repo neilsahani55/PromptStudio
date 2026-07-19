@@ -70,7 +70,7 @@ export default function RegisterPage() {
       }
 
       // Hard navigation so middleware + layout fully re-initialize with the new cookie
-      window.location.href = "/";
+      window.location.href = "/studio";
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {

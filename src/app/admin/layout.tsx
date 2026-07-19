@@ -74,7 +74,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
       })}
       <div className="my-3 border-t border-border" />
       <Link
-        href="/"
+        href="/studio"
         onClick={onNavigate}
         className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
       >
@@ -144,7 +144,7 @@ export default function AdminLayout({
             You do not have permission to access the admin panel. Please contact
             an administrator if you believe this is an error.
           </p>
-          <Link href="/">
+          <Link href="/studio">
             <Button variant="outline" className="mt-2">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to App
