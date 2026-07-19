@@ -26,10 +26,10 @@ export function Header() {
   return (
     <header className="py-3 px-4 md:px-6 border-b border-border/50 glass sticky top-0 z-50">
       <div className="container mx-auto max-w-5xl flex items-center justify-between">
-        <div className="flex items-center gap-3">
+        <Link href="/" className="flex items-center gap-3 group" title="Go to home page">
           <div className="relative">
             <div className="absolute inset-0 bg-primary/20 rounded-xl blur-md" />
-            <Logo size={42} className="relative rounded-xl shadow-lg shadow-primary/20" />
+            <Logo size={42} className="relative rounded-xl shadow-lg shadow-primary/20 group-hover:scale-105 transition-transform" />
           </div>
           <div>
             <h1 className="text-xl font-bold font-headline text-foreground tracking-tight">
@@ -39,7 +39,7 @@ export function Header() {
               Content to Image Prompt Generator
             </p>
           </div>
-        </div>
+        </Link>
         <div className="flex items-center gap-2">
           <div className="hidden md:flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-full border border-border/50">
             <Sparkles className="w-3 h-3 text-primary" />

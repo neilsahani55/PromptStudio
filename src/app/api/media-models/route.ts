@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { availableMediaModels, MEDIA_MODELS } from '@/lib/media-models';
+import { MEDIA_MODELS, providerConfigured } from '@/lib/media-models';
 import { DAILY_CREDITS, CREDIT_COSTS, getCreditsUsedToday } from '@/lib/credits';
+import { listUserKeys } from '@/lib/user-keys';
 
 export const runtime = 'nodejs';
 
@@ -15,9 +16,18 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }
 
-  const available = availableMediaModels().map(({ id, label, kind, note, provider }) => ({
-    id, label, kind, note, provider,
-  }));
+  // A provider is usable when the platform has keys OR the user brought their
+  // own (BYOK): huggingface key → hf models, nvidia key → nvidia models.
+  const userKeys = await listUserKeys(auth.userId);
+  const userProviders = new Set(
+    userKeys
+      .map((k) => (k.provider === 'huggingface' ? 'hf' : k.provider === 'nvidia' ? 'nvidia' : null))
+      .filter(Boolean) as string[]
+  );
+
+  const available = MEDIA_MODELS
+    .filter((m) => providerConfigured(m.provider) || userProviders.has(m.provider))
+    .map(({ id, label, kind, note, provider }) => ({ id, label, kind, note, provider }));
   const configuredProviders = new Set(available.map((m) => m.provider));
   const missingProviders = Array.from(
     new Set(MEDIA_MODELS.map((m) => m.provider).filter((p) => !configuredProviders.has(p)))

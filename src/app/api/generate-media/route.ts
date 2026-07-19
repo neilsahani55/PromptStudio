@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { verifyToken } from '@/lib/auth';
 import { getMediaModel, providerConfigured, type MediaModel } from '@/lib/media-models';
 import { DAILY_CREDITS, CREDIT_COSTS, getCreditsUsedToday, chargeCredits, refundCredits } from '@/lib/credits';
+import { getUserKey } from '@/lib/user-keys';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -34,8 +35,11 @@ const okJson = (data: unknown) => NextResponse.json(data);
 const errJson = (status: number, error: string, detail?: string, hint?: string) =>
   NextResponse.json({ error, detail, hint }, { status });
 
+const HF_CREDITS_HINT =
+  'The app\'s Hugging Face free credits are used up. Add your OWN Hugging Face token in Settings → API Keys to generate on your own quota (free tokens at huggingface.co/settings/tokens), or buy credits at huggingface.co/settings/billing.';
+
 // ─── NVIDIA (NVCF async: 45s hold, then 202+reqId for client polling) ───────
-async function runNvidia(model: MediaModel, prompt: string, ar: string, seed: number, deadline: number) {
+async function runNvidia(model: MediaModel, prompt: string, ar: string, seed: number, deadline: number, apiKey: string) {
   const { width, height } = dims(ar);
   const isDistilled = /klein|schnell|turbo/i.test(model.endpoint);
   const controller = new AbortController();
@@ -43,7 +47,7 @@ async function runNvidia(model: MediaModel, prompt: string, ar: string, seed: nu
   const res = await fetch(`https://ai.api.nvidia.com/v1/genai/${model.endpoint}`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${process.env.NVIDIA_API_KEY}`,
+      Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
       Accept: 'application/json',
       'NVCF-POLL-SECONDS': '45',
@@ -70,8 +74,6 @@ async function runNvidia(model: MediaModel, prompt: string, ar: string, seed: nu
 }
 
 // ─── Cloudflare Workers AI ──────────────────────────────────────────────────
-// flux-1-schnell returns JSON { result: { image: <b64> } }; the SDXL-family
-// models stream raw PNG bytes. Handle both shapes.
 async function runCloudflare(model: MediaModel, prompt: string, deadline: number) {
   const acct = process.env.CLOUDFLARE_ACCOUNT_ID;
   const controller = new AbortController();
@@ -103,24 +105,27 @@ async function runCloudflare(model: MediaModel, prompt: string, deadline: number
     if (!b64) return errJson(502, 'No image returned from model');
     return okJson({ modelId: model.id, kind: 'image', media: { base64: `data:image/jpeg;base64,${b64}`, url: null } });
   }
-  // Binary image stream
   const buf = Buffer.from(await res.arrayBuffer());
   if (buf.length < 1000) return errJson(502, 'Empty image from model');
   const mime = contentType.startsWith('image/') ? contentType : 'image/png';
   return okJson({ modelId: model.id, kind: 'image', media: { base64: `data:${mime};base64,${buf.toString('base64')}`, url: null } });
 }
 
-// ─── Hugging Face Inference Providers router ────────────────────────────────
-async function runHf(model: MediaModel, prompt: string, deadline: number) {
+// ─── Hugging Face router ────────────────────────────────────────────────────
+// Images: Together's OpenAI-compatible route (verified live July 2026).
+// Video: fal's async queue — POST returns a request_id which the client polls
+// via /api/generate-media/status (each poll is its own request, so long video
+// renders aren't bound by the 60s function limit).
+async function runHf(model: MediaModel, prompt: string, deadline: number, hfToken: string) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), Math.max(2_000, deadline - Date.now()));
   const headers = {
-    Authorization: `Bearer ${process.env.HF_TOKEN}`,
+    Authorization: `Bearer ${hfToken}`,
     'Content-Type': 'application/json',
   };
   try {
     if (model.kind === 'image') {
-      const res = await fetch('https://router.huggingface.co/v1/images/generations', {
+      const res = await fetch('https://router.huggingface.co/together/v1/images/generations', {
         method: 'POST',
         headers,
         body: JSON.stringify({ model: model.endpoint, prompt, response_format: 'b64_json' }),
@@ -129,7 +134,7 @@ async function runHf(model: MediaModel, prompt: string, deadline: number) {
       const text = await res.text();
       if (!res.ok) {
         return errJson(502, `${model.label} failed`, text.slice(0, 250),
-          'HF free credits may be exhausted, or this model has no active provider. Check https://huggingface.co/settings/billing');
+          res.status === 402 ? HF_CREDITS_HINT : undefined);
       }
       const data: any = JSON.parse(text);
       const item = data?.data?.[0];
@@ -138,29 +143,22 @@ async function runHf(model: MediaModel, prompt: string, deadline: number) {
       if (!b64 && !url) return errJson(502, 'No image returned from model');
       return okJson({ modelId: model.id, kind: 'image', media: { base64: b64, url } });
     }
-    // Video (beta): OpenAI-style videos endpoint on the HF router.
-    const res = await fetch('https://router.huggingface.co/v1/videos/generations', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ model: model.endpoint, prompt }),
-      signal: controller.signal,
-    });
-    const contentType = res.headers.get('content-type') || '';
+
+    // Video via fal queue
+    const res = await fetch(
+      `https://router.huggingface.co/fal-ai/${model.endpoint}?_subdomain=queue`,
+      { method: 'POST', headers, body: JSON.stringify({ prompt }), signal: controller.signal }
+    );
+    const text = await res.text();
     if (!res.ok) {
-      const text = await res.text();
       return errJson(502, `${model.label} failed`, text.slice(0, 250),
-        'Video generation uses HF Inference Provider credits and is beta — the model may have no active provider right now.');
+        res.status === 402 ? HF_CREDITS_HINT : undefined);
     }
-    if (contentType.startsWith('video/')) {
-      const buf = Buffer.from(await res.arrayBuffer());
-      return okJson({ modelId: model.id, kind: 'video', media: { base64: `data:${contentType};base64,${buf.toString('base64')}`, url: null } });
-    }
-    const data: any = await res.json();
-    const item = data?.data?.[0];
-    const url = item?.url ?? null;
-    const b64 = item?.b64_json ? `data:video/mp4;base64,${item.b64_json}` : null;
-    if (!url && !b64) return errJson(502, 'No video returned from model');
-    return okJson({ modelId: model.id, kind: 'video', media: { base64: b64, url } });
+    let data: any;
+    try { data = JSON.parse(text); } catch { return errJson(502, 'Invalid response from video provider'); }
+    const requestId = data?.request_id;
+    if (!requestId) return errJson(502, `${model.label} did not return a job id`, text.slice(0, 200));
+    return okJson({ pending: true, falRequestId: requestId, falEndpoint: model.endpoint, modelId: model.id, kind: 'video' });
   } finally {
     clearTimeout(timer);
   }
@@ -183,9 +181,21 @@ export async function POST(req: NextRequest) {
     const { modelId, aspectRatio } = parsed.data;
     const model = getMediaModel(modelId);
     if (!model) return errJson(400, `Unknown model: ${modelId}`);
-    if (!providerConfigured(model.provider)) {
+
+    // BYOK: a user's own key unlocks the provider even without platform keys,
+    // and takes precedence so generation runs on their own quota.
+    const userHf = model.provider === 'hf' ? await getUserKey(auth.userId, 'huggingface') : null;
+    const userNvidia = model.provider === 'nvidia' ? await getUserKey(auth.userId, 'nvidia') : null;
+    const hfToken = userHf?.apiKey || process.env.HF_TOKEN || '';
+    const nvidiaKey = userNvidia?.apiKey || process.env.NVIDIA_API_KEY || '';
+
+    const usable =
+      (model.provider === 'hf' && !!hfToken) ||
+      (model.provider === 'nvidia' && !!nvidiaKey) ||
+      (model.provider === 'cloudflare' && providerConfigured('cloudflare'));
+    if (!usable) {
       return errJson(501, `${model.label} is not configured`, undefined,
-        'Add the provider keys in your environment (see ENVIRONMENT.md).');
+        'Add the provider keys in Settings → API Keys (or in the server environment — see ENVIRONMENT.md).');
     }
 
     // ── Daily credits (admins are unlimited) ────────────────────────────────
@@ -211,13 +221,13 @@ export async function POST(req: NextRequest) {
     let res: NextResponse;
     switch (model.provider) {
       case 'nvidia':
-        res = await runNvidia(model, prompt, aspectRatio, seed, deadline);
+        res = await runNvidia(model, prompt, aspectRatio, seed, deadline, nvidiaKey);
         break;
       case 'cloudflare':
         res = await runCloudflare(model, prompt, deadline);
         break;
       case 'hf':
-        res = await runHf(model, prompt, deadline);
+        res = await runHf(model, prompt, deadline, hfToken);
         break;
     }
     // Provider failed — the user shouldn't lose a credit for it.

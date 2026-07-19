@@ -1023,7 +1023,7 @@ export default function PromptStudioPage() {
                               style={{ width: `${(rateLimitRemaining / rateLimitTotal) * 100}%` }}
                             />
                           </div>
-                          <span>{rateLimitRemaining} generations left</span>
+                          <span>{rateLimitRemaining} prompt generations left</span>
                           {rateLimitRemaining < 5 && (
                             <span className="text-muted-foreground/70">· resets soon</span>
                           )}
@@ -1263,7 +1263,7 @@ export default function PromptStudioPage() {
                 {usedModel && <span>· {usedModel.split('/').pop()}</span>}
                 {rateLimitRemaining !== null && (
                   <span className={rateLimitRemaining < 5 ? 'text-amber-500' : ''}>
-                    · {rateLimitRemaining}/{rateLimitTotal} remaining
+                    · {rateLimitRemaining}/{rateLimitTotal} prompt generations left
                   </span>
                 )}
                 <span className="ml-auto opacity-60">Ctrl+Enter to regenerate</span>

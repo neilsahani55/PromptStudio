@@ -19,7 +19,6 @@ import {
   Check,
   Zap,
   Layers,
-  ScanEye,
 } from "lucide-react";
 
 const PLATFORMS = ["Midjourney v6", "DALL·E 3", "Stable Diffusion XL", "Flux"];
@@ -31,29 +30,29 @@ const FEATURES = [
     body: "Understands topic, tone, and context — not keyword stuffing. Paste a blog post and get prompts that actually capture the idea.",
   },
   {
-    icon: ScanEye,
-    title: "Screenshot enhancement",
-    body: "Upload a UI screenshot and PromptStudio preserves its layout while upgrading the visual style to something polished.",
-  },
-  {
-    icon: Cpu,
-    title: "Multi-model backend",
-    body: "Gemini 2.5 Flash by default, plus DeepSeek, Qwen, GLM, Kimi and GPT-OSS via NVIDIA NIM — with automatic fallback.",
+    icon: Wand2,
+    title: "Media Studio — up to 4 models at once",
+    body: "Generate the same prompt on up to 4 image models side by side (FLUX, SDXL, Qwen-Image and more) and keep the best result.",
   },
   {
     icon: ImageIcon,
-    title: "In-app image generation",
-    body: "Go from prompt to picture without leaving the app. Generate directly with Flux and Stable Diffusion 3.5.",
+    title: "Video generation",
+    body: "Turn your master prompt into motion: auto-adapted video prompts rendered with Wan 2.2 and HunyuanVideo.",
+  },
+  {
+    icon: Cpu,
+    title: "Bring your own API keys",
+    body: "Add your own Hugging Face, NVIDIA, OpenAI, Gemini, DeepSeek or Ollama keys — verified live, stored encrypted, generation on your own quota.",
   },
   {
     icon: Gauge,
-    title: "Quality scoring",
-    body: "Every prompt is scored on completeness, specificity and coherence. A de-vagueness pass strips filler automatically.",
+    title: "Fair daily credits",
+    body: "10 free credits every day (images 1, videos 2) with automatic refunds when a provider fails. Resets at midnight UTC.",
   },
   {
     icon: Palette,
-    title: "10 adaptive themes",
-    body: "The entire interface — logo, buttons, charts, admin panel — recolours instantly across ten hand-tuned themes.",
+    title: "Cloud gallery + 10 themes",
+    body: "Every generation saved to your account-synced gallery, in an interface that recolours across ten hand-tuned themes.",
   },
 ];
 
@@ -203,7 +202,7 @@ export default function LandingPage() {
         <div className="pointer-events-none absolute -top-24 -left-24 w-96 h-96 bg-primary/20 blur-3xl rounded-full" />
         <div className="pointer-events-none absolute top-40 -right-24 w-96 h-96 bg-accent/30 blur-3xl rounded-full" />
 
-        <div className="container mx-auto max-w-6xl px-4 md:px-6 pt-10 md:pt-14 pb-20 md:pb-28">
+        <div className="container mx-auto max-w-6xl px-4 md:px-6 pt-4 md:pt-6 pb-20 md:pb-28">
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-8 items-center">
             <div className="text-center lg:text-left">
               <div className="inline-flex items-center gap-2 text-xs font-medium text-primary bg-primary/10 border border-primary/20 px-3 py-1.5 rounded-full mb-6">
@@ -218,8 +217,8 @@ export default function LandingPage() {
 
               <p className="mt-6 text-lg text-muted-foreground max-w-xl mx-auto lg:mx-0 leading-relaxed">
                 PromptStudio transforms blog posts, screenshots, and ideas into platform-optimized
-                prompts for Midjourney, DALL·E 3, Stable Diffusion, and Flux — then generates the
-                images for you, right in the app.
+                prompts — then generates <strong className="text-foreground">images and videos</strong> across
+                multiple AI models at once, right in the app. Sign in with Google and create.
               </p>
 
               <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
@@ -432,7 +431,8 @@ export default function LandingPage() {
         </div>
         <div className="border-t border-border/50">
           <p className="container mx-auto max-w-6xl px-4 md:px-6 py-4 text-center text-xs text-muted-foreground">
-            © 2025 PromptStudio · Built with Next.js, Genkit &amp; NVIDIA NIM
+            © 2026 PromptStudio · Built by <span className="text-foreground font-medium">Neel Sahani</span> · Contact:{" "}
+            <a href="mailto:promptstudio55@gmail.com" className="text-primary hover:underline">promptstudio55@gmail.com</a>
           </p>
         </div>
       </footer>

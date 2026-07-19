@@ -82,7 +82,9 @@ export const MEDIA_MODELS: MediaModel[] = [
     maxPrompt: 2000,
     note: 'Artistic · Cloudflare',
   },
-  // ─── Images: Hugging Face router ──────────────────────────────
+  // ─── Images: Hugging Face router → Together (verified live) ──
+  // Image endpoints are Together model ids, called through HF's router at
+  // /together/v1/images/generations (verified July 2026).
   {
     id: 'hf-flux-schnell',
     label: 'FLUX.1 Schnell (HF)',
@@ -91,24 +93,6 @@ export const MEDIA_MODELS: MediaModel[] = [
     endpoint: 'black-forest-labs/FLUX.1-schnell',
     maxPrompt: 2000,
     note: 'Fast · Hugging Face',
-  },
-  {
-    id: 'hf-flux-dev',
-    label: 'FLUX.1 Dev (HF)',
-    kind: 'image',
-    provider: 'hf',
-    endpoint: 'black-forest-labs/FLUX.1-dev',
-    maxPrompt: 2000,
-    note: 'High quality · Hugging Face',
-  },
-  {
-    id: 'hf-sd35',
-    label: 'SD 3.5 Large',
-    kind: 'image',
-    provider: 'hf',
-    endpoint: 'stabilityai/stable-diffusion-3.5-large',
-    maxPrompt: 2000,
-    note: 'Stable Diffusion flagship · Hugging Face',
   },
   {
     id: 'hf-sdxl',
@@ -128,22 +112,15 @@ export const MEDIA_MODELS: MediaModel[] = [
     maxPrompt: 2000,
     note: 'Best text-in-image · Hugging Face',
   },
-  // ─── Video: Hugging Face router (beta — uses HF credits) ─────
-  {
-    id: 'hf-ltx-video',
-    label: 'LTX-Video',
-    kind: 'video',
-    provider: 'hf',
-    endpoint: 'Lightricks/LTX-Video',
-    maxPrompt: 1200,
-    note: 'Fast video · Hugging Face',
-  },
+  // ─── Video: Hugging Face router → fal queue (verified routes) ─
+  // Video endpoints are fal provider ids, called through HF's router at
+  // /fal-ai/{id}?_subdomain=queue with async polling. Uses HF credits.
   {
     id: 'hf-wan',
     label: 'Wan 2.2',
     kind: 'video',
     provider: 'hf',
-    endpoint: 'Wan-AI/Wan2.2-T2V-A14B',
+    endpoint: 'fal-ai/wan/v2.2-a14b/text-to-video',
     maxPrompt: 1200,
     note: 'Cinematic video · Hugging Face',
   },
@@ -152,7 +129,7 @@ export const MEDIA_MODELS: MediaModel[] = [
     label: 'HunyuanVideo',
     kind: 'video',
     provider: 'hf',
-    endpoint: 'tencent/HunyuanVideo',
+    endpoint: 'fal-ai/hunyuan-video',
     maxPrompt: 1200,
     note: '13B cinematic video · Hugging Face',
   },

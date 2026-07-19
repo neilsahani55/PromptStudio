@@ -58,6 +58,30 @@ async function pollStatus(reqId: string): Promise<{ base64: string | null; url: 
   throw new Error("Timed out after 4 minutes.");
 }
 
+// Poll a fal video job (via /api/generate-media/status). Video renders can
+// take minutes — allow up to 8, with a gentle poll interval.
+async function pollVideo(endpoint: string, requestId: string): Promise<{ base64: string | null; url: string | null }> {
+  const deadline = Date.now() + 480_000;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 5000));
+    let res: Response;
+    try {
+      res = await fetch(
+        `/api/generate-media/status?endpoint=${encodeURIComponent(endpoint)}&id=${encodeURIComponent(requestId)}`,
+        { credentials: "same-origin" }
+      );
+    } catch { continue; }
+    let data: any = null;
+    try { data = JSON.parse(await res.text()); } catch { continue; }
+    if (data?.pending) continue;
+    if (!res.ok || data?.error) {
+      throw new Error([data?.error || "Video generation failed", data?.detail].filter(Boolean).join(" — "));
+    }
+    if (data?.media) return data.media;
+  }
+  throw new Error("Video timed out after 8 minutes. Try again or use a shorter prompt.");
+}
+
 async function downloadMedia(src: string, filename: string) {
   try {
     const resp = await fetch(src);
@@ -119,10 +143,19 @@ export function MediaStudio({
     loadModels(true);
   }, [loadModels]);
 
-  // Seed the image prompt from the master prompt whenever it changes.
+  // Seed the image prompt from the master prompt whenever it changes, and
+  // clear the stale video adaptation so it regenerates for the new content.
   useEffect(() => {
-    setPrompts((prev) => ({ ...prev, image: masterPrompt }));
+    setPrompts((prev) => ({ ...prev, image: masterPrompt, video: "" }));
   }, [masterPrompt]);
+
+  // Auto-adapt the video prompt the first time the user opens Video mode.
+  useEffect(() => {
+    if (mode === "video" && !prompts.video && masterPrompt && !adapting) {
+      adaptForVideo();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, masterPrompt]);
 
   const toggleModel = (id: string) => {
     setSelected((prev) => {
@@ -163,8 +196,13 @@ export function MediaStudio({
       let data: any = null;
       try { data = JSON.parse(await res.text()); } catch { throw new Error(`Server Error (${res.status})`); }
       if (res.ok && data?.pending && data?.reqId) {
+        // NVIDIA async job
         const media = await pollStatus(data.reqId);
         data = { ...data, media: { base64: media.base64, url: media.url }, kind: "image" };
+      } else if (res.ok && data?.pending && data?.falRequestId) {
+        // fal video job — polls for up to 8 minutes
+        const media = await pollVideo(data.falEndpoint, data.falRequestId);
+        data = { ...data, media, kind: "video" };
       }
       if (!res.ok || !data?.media) {
         throw new Error([data?.error || "Generation failed", data?.detail, data?.hint].filter(Boolean).join(" — "));

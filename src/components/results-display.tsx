@@ -8,13 +8,11 @@ import { Textarea } from "./ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 import { useEffect, useState } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { submitFeedback } from "@/app/actions";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { QuickFixChips, FixType } from "@/components/quick-fix-chips";
-import { useImageGallery } from "@/hooks/use-image-gallery";
 import { MediaStudio } from "@/components/media-studio";
 import {
   Accordion,
@@ -446,7 +444,6 @@ function MultiPlatformPrompt({
   isRefining?: boolean,
 }) {
   const { toast } = useToast();
-  const { addImage } = useImageGallery();
   const [activeVariantIndex, setActiveVariantIndex] = useState(-1);
   const [feedbackStatus, setFeedbackStatus] = useState<'none' | 'liked' | 'disliked'>('none');
   const [selectedStyle, setSelectedStyle] = useState<BrandStyle>('modern_saas_3d');
@@ -502,9 +499,21 @@ function MultiPlatformPrompt({
 
   if (!prompts) return null;
 
+  // When a variant is selected, the hero card and Media Studio follow it —
+  // the variant's Flux prompt is the best "universal" representative.
+  const activeVariantName =
+    activeVariantIndex >= 0 && variants?.[activeVariantIndex] ? variants[activeVariantIndex].name : null;
+
   const currentPrompts = activeVariantIndex === -1
     ? prompts
     : variants && variants[activeVariantIndex] ? variants[activeVariantIndex].prompts : prompts;
+
+  // The prompt shown in the hero card + fed to the Media Studio: the master
+  // prompt normally, or the selected variant's Flux prompt (its closest
+  // universal representative).
+  const displayMaster = activeVariantIndex === -1
+    ? (masterPrompt || '')
+    : ((currentPrompts as Record<string, string> | undefined)?.flux || masterPrompt || '');
 
   const getPlatformIcon = (platform: string) => {
     switch(platform) {
@@ -726,17 +735,19 @@ function MultiPlatformPrompt({
               <Globe className="w-4 h-4 text-primary" />
             </div>
             <div>
-              <p className="text-sm font-bold">Master Prompt</p>
+              <p className="text-sm font-bold">{activeVariantName || "Master Prompt"}</p>
               <p className="text-[11px] text-muted-foreground">
-                Universal format — powers image &amp; video generation below, or paste into any AI model
+                {activeVariantName
+                  ? "Variant creative direction — generation below uses this variant"
+                  : "Universal format — powers image & video generation below, or paste into any AI model"}
               </p>
             </div>
           </div>
 
           <PromptDisplay
-            title="Master Universal Prompt"
-            content={masterPrompt || "Master prompt not available."}
-            onCopy={() => copyToClipboard(masterPrompt || "", toast)}
+            title={activeVariantName ? `${activeVariantName} Prompt` : "Master Universal Prompt"}
+            content={displayMaster || "Master prompt not available."}
+            onCopy={() => copyToClipboard(displayMaster || "", toast)}
           />
 
           {onFix && activeVariantIndex === -1 && (
@@ -745,7 +756,7 @@ function MultiPlatformPrompt({
 
           {/* Media Studio: multi-model image + video generation */}
           <MediaStudio
-            masterPrompt={masterPrompt || ""}
+            masterPrompt={displayMaster || ""}
             aspectRatio={qualityMetrics?.suggestedAspectRatio || "16:9"}
           />
         </div>

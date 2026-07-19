@@ -1,8 +1,10 @@
 # PromptStudio
 
-An AI-powered prompt-generation studio that turns blog posts, screenshots, or any text content into platform-optimized image prompts for **Midjourney v6**, **DALL-E 3**, **Stable Diffusion XL**, and **Flux** — with in-app image generation for Flux and Stable Diffusion 3.5.
+An AI-powered prompt-generation studio that turns blog posts, screenshots, or any text content into platform-optimized image prompts for **Midjourney v6**, **DALL-E 3**, **Stable Diffusion**, and **Flux** — with a built-in **Media Studio** that generates images across up to 4 AI models at once and videos across 2, so you always pick the best result.
 
-Built with Next.js 15, React 19, Google Genkit, and NVIDIA NIM.
+Built with Next.js 15, React 19, Google Genkit, Supabase, NVIDIA NIM, Cloudflare Workers AI, and Hugging Face Inference Providers.
+
+**Live:** https://promptstudios.vercel.app · Built by **Neel Sahani** · Contact: promptstudio55@gmail.com
 
 ---
 
@@ -10,12 +12,15 @@ Built with Next.js 15, React 19, Google Genkit, and NVIDIA NIM.
 
 - **Semantic text-to-prompt** — understands topic, tone, and context (not keyword extraction)
 - **Screenshot enhancement** — analyses UI screenshots and preserves their layout while upgrading the visual style
-- **Multi-model backend** — Google Gemini 2.5 Flash (default), plus DeepSeek V3.2, Qwen 3.5, GLM 4.7, Kimi K2, GPT-OSS 120B via NVIDIA NIM
-- **In-app image generation** — direct Flux and Stable Diffusion 3.5 output from the UI
-- **Quality scoring** — every prompt scored on completeness, specificity, coherence, length; de-vagueness pass removes filler words; style conflicts auto-resolved
-- **10-theme UI** — Light, Dark, Ocean Blue, Forest Green, Sunset, Rose, Midnight, Lavender, Charcoal, Emerald; logo, avatars, buttons, and admin panel all recolour automatically
-- **Local-first history** — every generation is saved to your browser with search, tags, favourites
-- **Auth + admin panel** — JWT login, user management, usage analytics, feedback triage with bidirectional notifications
+- **Media Studio** — generate one prompt on up to **4 image models at once** (NVIDIA FLUX.2 Klein / FLUX.1 Dev, Cloudflare FLUX Schnell / SDXL Lightning / SDXL / DreamShaper, HF FLUX Schnell / SDXL / Qwen-Image) and pick the best
+- **Video generation** — the master prompt is auto-adapted with motion + camera language, then rendered with **Wan 2.2** or **HunyuanVideo**
+- **Bring your own keys (BYOK)** — users add their own Hugging Face / NVIDIA / OpenAI / Gemini / DeepSeek / Ollama keys in Settings; keys are live-verified before saving and stored encrypted (AES-256-GCM)
+- **Daily credits** — 10 free credits per user per day (image 1, video 2), UTC reset, automatic refund when a provider fails; admins unlimited
+- **Google sign-in** — verified-email accounts only (open email registration is disabled); configurable admin allowlist
+- **Cloud gallery** — every generated image saved to an account-synced gallery (Vercel Blob), plus prompt history with generated-image thumbnails
+- **Quality scoring** — every prompt scored on completeness, specificity, coherence, length; de-vagueness pass removes filler words
+- **10-theme UI** — logo, avatars, buttons, and admin panel all recolour automatically
+- **Admin panel + email alerts** — user management, usage analytics, feedback triage with SMTP notifications to your inbox
 
 ---
 
@@ -27,8 +32,11 @@ Built with Next.js 15, React 19, Google Genkit, and NVIDIA NIM.
 | UI | React 19, TailwindCSS 3.4, shadcn/ui (Radix primitives) |
 | AI orchestration | Google Genkit 1.20 |
 | Models | Gemini 2.5 Flash, NVIDIA NIM-hosted OpenAI-compatible models |
-| Auth | JWT (`jose`), bcryptjs password hashing, middleware-guarded routes |
+| Auth | Google OAuth (primary) + JWT (`jose`) sessions, middleware-guarded routes |
 | Database | [Supabase](https://supabase.com) Postgres (free tier) |
+| Media providers | NVIDIA NIM · Cloudflare Workers AI · Hugging Face Inference Providers (Together/fal) |
+| Storage | Vercel Blob (cloud image gallery) |
+| Email | Nodemailer + Gmail SMTP (feedback notifications) |
 | Validation | Zod |
 
 ### Routes
@@ -162,6 +170,16 @@ The database is **Supabase Postgres** — serverless-friendly on every platform:
 - API keys in `.env.local` should be rotated if you ever suspect they've been shared. NVIDIA and Google AI Studio both let you revoke individual keys.
 - The app uses JWT session cookies (`httpOnly`, `sameSite=lax`). Sessions expire after 7 days.
 - Rate limiting is per-user (20 generations/hour by default); configurable via `/admin/settings`.
+
+---
+
+## About & Contact
+
+**PromptStudio** is built and maintained by **Neel Sahani**.
+
+- 📧 Contact: [promptstudio55@gmail.com](mailto:promptstudio55@gmail.com)
+- 🌐 Live app: https://promptstudios.vercel.app
+- 💬 Feedback: use the in-app feedback dialog — it lands straight in the owner's inbox
 
 ---
 

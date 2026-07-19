@@ -15,6 +15,19 @@ import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
 import { exec } from '@/lib/db';
 import { getSettingBool, getSetting } from '@/lib/settings';
+import { completeWithUserLlm } from '@/lib/user-keys';
+
+async function getAuthUserId(): Promise<number | null> {
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get('auth-token')?.value;
+    if (!token) return null;
+    const auth = await verifyToken(token);
+    return auth?.userId ?? null;
+  } catch {
+    return null;
+  }
+}
 
 async function logUsage(model: string, inputType: string, durationMs: number) {
   try {
@@ -377,6 +390,14 @@ export async function enhanceInputText(
   );
 
   try {
+    // Prefer the user's own LLM key (BYOK) when configured.
+    const uid = await getAuthUserId();
+    if (uid) {
+      const byok = await completeWithUserLlm(uid, instruction).catch(() => null);
+      const out = byok?.text?.trim().replace(/^["']|["']$/g, '');
+      if (out) return { success: true, data: out };
+    }
+
     const res = await Promise.race([
       ai.generate({ model: model || 'googleai/gemini-2.5-flash', prompt: instruction }),
       deadline,
@@ -415,6 +436,14 @@ export async function getVideoMasterPrompt(imagePrompt: string): Promise<ActionR
   );
 
   try {
+    // Prefer the user's own LLM key (BYOK) when configured.
+    const uid = await getAuthUserId();
+    if (uid) {
+      const byok = await completeWithUserLlm(uid, instruction).catch(() => null);
+      const out = byok?.text?.trim().replace(/^["']|["']$/g, '');
+      if (out) return { success: true, data: out };
+    }
+
     const res = await Promise.race([
       ai.generate({ model: 'googleai/gemini-2.5-flash', prompt: instruction }),
       deadline,

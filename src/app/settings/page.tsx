@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ApiKeysManager } from "@/components/api-keys-manager";
 import {
   ArrowLeft,
   Settings,
@@ -502,6 +503,9 @@ export default function SettingsPage() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Bring-your-own API keys */}
+        <ApiKeysManager />
       </div>
     </div>
   );
