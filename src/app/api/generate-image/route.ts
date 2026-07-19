@@ -28,6 +28,11 @@ const FLUX_URL =
 const SD_URL =
   process.env.NVIDIA_SD_URL ||
   'https://ai.api.nvidia.com/v1/genai/stabilityai/stable-diffusion-3-5-large';
+// Qwen-Image — excels at rendering text inside images. Endpoint may vary by
+// account; override with NVIDIA_QWEN_URL if the default 404s for your key.
+const QWEN_URL =
+  process.env.NVIDIA_QWEN_URL ||
+  'https://ai.api.nvidia.com/v1/genai/qwen/qwen-image';
 
 // Base negative prompt for SD3 to prevent generic stock look
 const SD_BASE_NEGATIVE = "stock photo, watermark, amateur, blurry, distorted, low quality, grainy, text, signature, frame, border, disembodied hands, messy background";
@@ -57,7 +62,7 @@ function sanitizePromptForNvidia(prompt: string): string {
 const ASPECT_RATIO_PATTERN = /^\d+:\d+$/;
 
 const generateImageSchema = z.object({
-  model: z.enum(['flux', 'sd35']),
+  model: z.enum(['flux', 'sd35', 'qwen']),
   prompt: z.string().min(1).max(5000),
   negativePrompt: z.string().max(2000).optional(),
   aspectRatio: z
@@ -104,7 +109,7 @@ export async function POST(req: NextRequest) {
     // Try the requested model; if it's SD and returns 404 (endpoint not in
     // user's NVIDIA function catalog), transparently fall back to Flux so the
     // button still produces an image.
-    let model: 'flux' | 'sd35' = requestedModel;
+    let model: 'flux' | 'sd35' | 'qwen' = requestedModel;
     let fallbackUsed = false;
     let nim = buildNimRequest(model, { prompt, negativePrompt, aspectRatio, seed, stylePreset });
 
@@ -350,7 +355,7 @@ export async function POST(req: NextRequest) {
 }
 
 function buildNimRequest(
-  model: 'flux' | 'sd35',
+  model: 'flux' | 'sd35' | 'qwen',
   opts: { prompt: string; negativePrompt?: string; aspectRatio: string; seed?: number; stylePreset?: string }
 ) {
   // Get style-specific negative prompts
@@ -360,9 +365,17 @@ function buildNimRequest(
   }
 
   // Calculate dimensions based on aspect ratio
-  // Flux Dev on NIM has strict resolution support. 
+  // Flux Dev on NIM has strict resolution support.
   // Verified working: 1024x1024, 1344x768, 768x1344
   const { width, height } = aspectRatioToDims(opts.aspectRatio);
+
+  // Combine user negative prompt, style negatives, and base negatives (used by
+  // the aspect-ratio-based models: SD 3.5 and Qwen-Image).
+  const combinedNegative = [
+    opts.negativePrompt,
+    styleNegatives,
+    SD_BASE_NEGATIVE
+  ].filter(Boolean).join(", ");
 
   if (model === 'flux') {
     // Flux Schnell is a 4-step distilled model — max 4 steps accepted by NIM.
@@ -381,13 +394,22 @@ function buildNimRequest(
     };
   }
 
-  // Stable Diffusion 3 Medium (fallback for 3.5)
-  // Combine user negative prompt, style negatives, and base negatives
-  const combinedNegative = [
-    opts.negativePrompt,
-    styleNegatives,
-    SD_BASE_NEGATIVE
-  ].filter(Boolean).join(", ");
+  if (model === 'qwen') {
+    // Qwen-Image: aspect-ratio based, strong text-in-image rendering.
+    return {
+      url: QWEN_URL,
+      key: NVIDIA_KEY,
+      payload: {
+        prompt: opts.prompt,
+        aspect_ratio: normalizeSdAspectRatio(opts.aspectRatio),
+        seed: opts.seed ?? 0,
+        negative_prompt: combinedNegative,
+        cfg_scale: 4.0,
+        steps: 30,
+      },
+    };
+  }
+
 
   return {
     url: SD_URL,

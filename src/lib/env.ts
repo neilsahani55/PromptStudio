@@ -27,6 +27,7 @@ export const ENV_SPECS: EnvSpec[] = [
   { key: 'NVIDIA_NIM_BASE_URL', requirement: 'optional', purpose: 'NVIDIA base URL override' },
   { key: 'NVIDIA_FLUX_URL', requirement: 'optional', purpose: 'Flux image endpoint override' },
   { key: 'NVIDIA_SD_URL', requirement: 'optional', purpose: 'Stable Diffusion image endpoint override' },
+  { key: 'NVIDIA_QWEN_URL', requirement: 'optional', purpose: 'Qwen-Image endpoint override' },
   { key: 'ALLOWED_DEV_ORIGINS', requirement: 'optional', purpose: 'LAN origins for the dev server' },
 ];
 

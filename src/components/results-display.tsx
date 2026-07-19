@@ -451,11 +451,14 @@ function MultiPlatformPrompt({
   const [genErrors, setGenErrors] = useState<Record<string, string | null>>({});
 
   // ─── Image model comparison (Flux vs SD 3.5) ───────────────────────────────
-  type CompareModel = 'flux' | 'sd35';
+  type CompareModel = 'flux' | 'sd35' | 'qwen';
+  const COMPARE_MODELS: CompareModel[] = ['flux', 'sd35', 'qwen'];
+  const compareLabel = (m: CompareModel) =>
+    m === 'flux' ? 'Flux' : m === 'qwen' ? 'Qwen-Image' : 'Stable Diffusion 3.5';
   const [compareOpen, setCompareOpen] = useState(false);
-  const [compareState, setCompareState] = useState<Record<CompareModel, 'idle' | 'loading' | 'done' | 'error'>>({ flux: 'idle', sd35: 'idle' });
-  const [compareImages, setCompareImages] = useState<Record<CompareModel, string | null>>({ flux: null, sd35: null });
-  const [compareErrors, setCompareErrors] = useState<Record<CompareModel, string | null>>({ flux: null, sd35: null });
+  const [compareState, setCompareState] = useState<Record<CompareModel, 'idle' | 'loading' | 'done' | 'error'>>({ flux: 'idle', sd35: 'idle', qwen: 'idle' });
+  const [compareImages, setCompareImages] = useState<Record<CompareModel, string | null>>({ flux: null, sd35: null, qwen: null });
+  const [compareErrors, setCompareErrors] = useState<Record<CompareModel, string | null>>({ flux: null, sd35: null, qwen: null });
 
   const generateForCompare = async (model: CompareModel, prompt: string) => {
     setCompareState(prev => ({ ...prev, [model]: 'loading' }));
@@ -488,11 +491,12 @@ function MultiPlatformPrompt({
   const handleCompareModels = (prompt: string) => {
     if (!prompt) return;
     setCompareOpen(true);
-    setCompareImages({ flux: null, sd35: null });
-    // Fire both in parallel — each hits its own serverless function/time budget.
-    generateForCompare('flux', prompt);
-    generateForCompare('sd35', prompt);
+    setCompareImages({ flux: null, sd35: null, qwen: null });
+    // Fire all in parallel — each hits its own serverless function/time budget.
+    COMPARE_MODELS.forEach((m) => generateForCompare(m, prompt));
   };
+
+  const compareBusy = COMPARE_MODELS.some((m) => compareState[m] === 'loading');
 
   const handleGenerate = async (platform: string, prompt: string) => {
     const model = platform === 'flux' ? 'flux' : 'sd35';
@@ -886,32 +890,32 @@ function MultiPlatformPrompt({
                     Compare image models
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Generate this prompt on Flux and Stable Diffusion 3.5 at once.
+                    Generate this prompt on Flux, SD 3.5, and Qwen-Image at once.
                   </p>
                 </div>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => handleCompareModels(masterPrompt || "")}
-                  disabled={!masterPrompt || compareState.flux === 'loading' || compareState.sd35 === 'loading'}
+                  disabled={!masterPrompt || compareBusy}
                   className="gap-2 shrink-0"
                 >
-                  {(compareState.flux === 'loading' || compareState.sd35 === 'loading') ? (
+                  {compareBusy ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
                     <Columns className="w-4 h-4" />
                   )}
-                  Compare Flux vs SD 3.5
+                  Compare models
                 </Button>
               </div>
 
               {compareOpen && (
-                <div className="grid grid-cols-2 gap-3 md:gap-4">
-                  {(['flux', 'sd35'] as const).map((m) => (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+                  {COMPARE_MODELS.map((m) => (
                     <div key={m} className="rounded-xl border border-border bg-card overflow-hidden">
                       <div className="px-3 py-2 border-b border-border/60 bg-muted/40 flex items-center justify-between">
-                        <span className="text-xs sm:text-sm font-semibold">
-                          {m === 'flux' ? 'Flux' : 'Stable Diffusion 3.5'}
+                        <span className="text-xs sm:text-sm font-semibold truncate">
+                          {compareLabel(m)}
                         </span>
                         {compareImages[m] && (
                           <a
