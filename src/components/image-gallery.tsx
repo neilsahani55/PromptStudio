@@ -10,7 +10,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { useImageGallery, type GalleryImage } from "@/hooks/use-image-gallery";
 import { useToast } from "@/hooks/use-toast";
 
@@ -97,7 +96,7 @@ export function ImageGallery({
           </div>
         ) : (
           <>
-            <ScrollArea className="flex-1 -mx-2 px-2">
+            <div className="flex-1 min-h-0 overflow-y-auto -mx-2 px-2">
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {images.map((img) => (
                   <div
@@ -170,7 +169,7 @@ export function ImageGallery({
                   </div>
                 ))}
               </div>
-            </ScrollArea>
+            </div>
 
             <div className="flex items-center justify-between pt-2 border-t border-border/50">
               <p className="text-xs text-muted-foreground">
