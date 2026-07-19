@@ -16,34 +16,63 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { QuickFixChips, FixType } from "@/components/quick-fix-chips";
 import { useImageGallery } from "@/hooks/use-image-gallery";
 
-// When the image API returns an async job ({ pending, reqId }), poll the status
-// endpoint until the image is ready. Each poll is its own short request, so the
-// TOTAL generation time is not limited by any single request's 60s cap.
-async function pollForImage(reqId: string, startData: any): Promise<any> {
-  const deadline = Date.now() + 240_000; // give it up to ~4 minutes
-  while (Date.now() < deadline) {
-    await new Promise((r) => setTimeout(r, 3000));
-    let pres: Response;
-    try {
-      pres = await fetch(`/api/generate-image/status?reqId=${encodeURIComponent(reqId)}`, {
-        credentials: "same-origin",
-      });
-    } catch {
-      continue; // transient network blip — keep polling
-    }
-    const ptext = await pres.text();
-    let pdata: any = null;
-    try { pdata = JSON.parse(ptext); } catch { continue; }
-    if (pdata.pending) continue;
-    if (!pres.ok || pdata.error) {
-      const parts = [pdata.error || "Generation failed", pdata.detail, pdata.hint].filter(Boolean);
-      throw new Error(parts.join(" — "));
-    }
-    if (pdata.done && pdata.image) {
-      return { ...startData, image: pdata.image, pending: false };
-    }
+// Browser-side image generation via Pollinations (free, keyless, Flux-based).
+// The browser loads the image directly from Pollinations — there is NO Vercel
+// serverless function in the path, so it is NOT subject to the 60s limit and
+// can take as long as the model needs.
+const POLLINATIONS_MODEL: Record<string, string> = {
+  flux: 'flux',
+  sd35: 'turbo',
+  qwen: 'flux-realism',
+};
+
+function pollinationsDims(ar: string): { width: number; height: number } {
+  const m = ar.match(/^(\d+):(\d+)$/);
+  if (!m) return { width: 1024, height: 1024 };
+  const r = parseInt(m[1], 10) / parseInt(m[2], 10);
+  if (r > 1.2) return { width: 1280, height: 720 };
+  if (r < 0.85) return { width: 720, height: 1280 };
+  return { width: 1024, height: 1024 };
+}
+
+function loadImageEl(url: string, timeoutMs = 180_000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const img = document.createElement('img');
+    const timer = setTimeout(() => {
+      img.src = '';
+      reject(new Error('Image generation timed out (over 3 minutes).'));
+    }, timeoutMs);
+    img.onload = () => { clearTimeout(timer); resolve(); };
+    img.onerror = () => { clearTimeout(timer); reject(new Error('Image generation failed. Try again or simplify the prompt.')); };
+    img.src = url;
+  });
+}
+
+async function generateViaPollinations(
+  prompt: string,
+  aspectRatio: string,
+  seed: number,
+  model = 'flux'
+): Promise<{ url: string; dataUri: string }> {
+  const { width, height } = pollinationsDims(aspectRatio);
+  const clean = prompt.slice(0, 1500);
+  const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(clean)}?width=${width}&height=${height}&model=${model}&nologo=true&seed=${seed}`;
+  await loadImageEl(url); // waits for generation — no 60s cap
+  // Fetch to base64 for permanent gallery storage (best-effort; Pollinations is CORS-enabled).
+  let dataUri = url;
+  try {
+    const resp = await fetch(url);
+    const blob = await resp.blob();
+    dataUri = await new Promise<string>((res, rej) => {
+      const fr = new FileReader();
+      fr.onloadend = () => res(fr.result as string);
+      fr.onerror = () => rej(new Error('read failed'));
+      fr.readAsDataURL(blob);
+    });
+  } catch {
+    /* keep the URL if the fetch is blocked */
   }
-  throw new Error("Image generation timed out after 4 minutes. Try Flux or a simpler prompt.");
+  return { url, dataUri };
 }
 import { styleProfiles, BrandStyle } from "@/ai/utils/style-profiles";
 
@@ -494,27 +523,13 @@ function MultiPlatformPrompt({
     setCompareState(prev => ({ ...prev, [model]: 'loading' }));
     setCompareErrors(prev => ({ ...prev, [model]: null }));
     const aspectRatio = qualityMetrics?.suggestedAspectRatio || '16:9';
+    const seed = Math.floor(Math.random() * 1_000_000);
     try {
-      const res = await fetch('/api/generate-image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, prompt, aspectRatio, stylePreset: selectedStyle }),
-      });
-      const text = await res.text();
-      let data: any = null;
-      try { data = JSON.parse(text); } catch { throw new Error(`Server Error (${res.status})`); }
-      if (res.ok && data?.pending && data?.reqId) {
-        data = await pollForImage(data.reqId, data);
-      }
-      if (!res.ok || !data.image) {
-        const parts = [data?.error || 'Generation failed', data?.detail, data?.hint].filter(Boolean);
-        throw new Error(parts.join(' — '));
-      }
-      const url = data.image.url || data.image.base64;
-      if (!url) throw new Error('No image data received');
+      const pModel = POLLINATIONS_MODEL[model] || 'flux';
+      const { url, dataUri } = await generateViaPollinations(prompt, aspectRatio, seed, pModel);
       setCompareImages(prev => ({ ...prev, [model]: url }));
       setCompareState(prev => ({ ...prev, [model]: 'done' }));
-      addImage({ dataUri: url, prompt, platform: model, model: data.model || model, aspectRatio });
+      addImage({ dataUri, prompt, platform: model, model: pModel, aspectRatio });
     } catch (e: any) {
       setCompareErrors(prev => ({ ...prev, [model]: e?.message || 'Generation failed' }));
       setCompareState(prev => ({ ...prev, [model]: 'error' }));
@@ -532,82 +547,24 @@ function MultiPlatformPrompt({
   const compareBusy = COMPARE_MODELS.some((m) => compareState[m] === 'loading');
 
   const handleGenerate = async (platform: string, prompt: string) => {
-    const model = platform === 'flux' ? 'flux' : 'sd35';
-
     setGenState(prev => ({ ...prev, [platform]: 'loading' }));
     setGenErrors(prev => ({ ...prev, [platform]: null }));
 
     try {
-        const res = await fetch('/api/generate-image', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                model,
-                prompt,
-                aspectRatio: qualityMetrics?.suggestedAspectRatio || '16:9',
-                stylePreset: selectedStyle
-            }),
-        });
-
-        const text = await res.text();
-        let data: any = null;
-        try {
-          data = JSON.parse(text);
-        } catch {
-          throw new Error(`Server Error (${res.status})`);
-        }
-
-        // Async job — poll the status endpoint until the image is ready.
-        if (res.ok && data?.pending && data?.reqId) {
-          data = await pollForImage(data.reqId, data);
-        }
-
-        if (!res.ok || !data.image) {
-            // Surface the detailed reason and actionable hint from the server.
-            // Coerce to strings defensively — a non-string value would render
-            // as "[object Object]" when joined.
-            const toStr = (v: unknown): string | null => {
-              if (v == null) return null;
-              if (typeof v === 'string') return v;
-              try { return JSON.stringify(v); } catch { return String(v); }
-            };
-            const parts = [
-              toStr(data.error) || 'Generation failed',
-              toStr(data.detail),
-              toStr(data.hint),
-            ].filter(Boolean);
-            throw new Error(parts.join(' — '));
-        }
-
-        const imageUrl = data.image.url || data.image.base64;
-        if (!imageUrl) throw new Error("No image data received");
+        const aspectRatio = qualityMetrics?.suggestedAspectRatio || '16:9';
+        const seed = Math.floor(Math.random() * 1_000_000);
+        const { url: imageUrl, dataUri } = await generateViaPollinations(prompt, aspectRatio, seed, 'flux');
 
         setGeneratedImages(prev => ({ ...prev, [platform]: imageUrl }));
         setGenState(prev => ({ ...prev, [platform]: 'done' }));
 
-        // Persist to the local gallery so users can revisit generated images.
-        addImage({
-          dataUri: imageUrl,
-          prompt,
-          platform,
-          model: data.model || model,
-          aspectRatio: qualityMetrics?.suggestedAspectRatio || '16:9',
-        });
+        // Persist to the gallery (base64 for permanence).
+        addImage({ dataUri, prompt, platform, model: 'flux', aspectRatio });
 
-        if (data.fallbackUsed) {
-            const usedLabel = data.model === 'google' ? 'Google' : data.model === 'flux' ? 'Flux' : data.model;
-            toast({
-                title: `Image Generated (via ${usedLabel})`,
-                description: data.model === 'google'
-                  ? "NVIDIA was slow to respond, so we generated with Google instead."
-                  : "The requested model wasn't available, so we used a fallback."
-            });
-        } else {
-            toast({
-                title: "Image Generated!",
-                description: `Successfully generated with ${data.model === 'flux' ? 'Flux' : 'Stable Diffusion'}.`
-            });
-        }
+        toast({
+            title: "Image Generated!",
+            description: "Created with Flux — runs in your browser, no time limit."
+        });
 
     } catch (e: any) {
         console.error("Generation error:", e);
