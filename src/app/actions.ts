@@ -26,7 +26,9 @@ async function logUsage(model: string, inputType: string, durationMs: number) {
       if (auth) userId = auth.userId;
     }
     await exec(
-      'INSERT INTO usage_log (user_id, model, input_type, duration_ms) VALUES (?, ?, ?, ?)',
+      `INSERT INTO usage_log (user_id, user_name, model, input_type, duration_ms)
+       VALUES (?, (SELECT name FROM users WHERE id = ?), ?, ?, ?)`,
+      userId,
       userId,
       model,
       inputType,

@@ -93,14 +93,43 @@ async function init(): Promise<void> {
       );
       -- Idempotent column migrations
       ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active';
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_provider TEXT DEFAULT 'password';
       ALTER TABLE feedback ADD COLUMN IF NOT EXISTS admin_responded_at TIMESTAMPTZ;
       ALTER TABLE feedback ADD COLUMN IF NOT EXISTS user_viewed_at TIMESTAMPTZ;
+      -- Denormalized user_name so rows are readable directly in the dashboard
+      ALTER TABLE usage_log ADD COLUMN IF NOT EXISTS user_name TEXT;
+      ALTER TABLE activity_log ADD COLUMN IF NOT EXISTS user_name TEXT;
+      ALTER TABLE gallery_images ADD COLUMN IF NOT EXISTS user_name TEXT;
     `);
 
+    // Backfill user_name on rows created before the column existed.
+    await client.unsafe(`
+      UPDATE usage_log t SET user_name = u.name FROM users u WHERE t.user_id = u.id AND t.user_name IS NULL;
+      UPDATE activity_log t SET user_name = u.name FROM users u WHERE t.user_id = u.id AND t.user_name IS NULL;
+      UPDATE gallery_images t SET user_name = u.name FROM users u WHERE t.user_id = u.id AND t.user_name IS NULL;
+    `);
+
+    await pruneLogs();
     await seedSettings();
     await seedAdmin();
   })();
   return initPromise;
+}
+
+// Retention: keep only the last 7 days AND at most the newest 200 rows in the
+// high-churn log tables. Runs on every cold start (init) — cheap and frequent
+// enough for this app's volume.
+async function pruneLogs(): Promise<void> {
+  try {
+    await client.unsafe(`
+      DELETE FROM usage_log WHERE created_at < now() - interval '7 days'
+        OR id NOT IN (SELECT id FROM usage_log ORDER BY id DESC LIMIT 200);
+      DELETE FROM activity_log WHERE created_at < now() - interval '7 days'
+        OR id NOT IN (SELECT id FROM activity_log ORDER BY id DESC LIMIT 200);
+    `);
+  } catch (e) {
+    console.warn('[db] log pruning failed (non-fatal):', e);
+  }
 }
 
 async function seedSettings(): Promise<void> {

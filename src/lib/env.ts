@@ -30,6 +30,9 @@ export const ENV_SPECS: EnvSpec[] = [
   { key: 'CLOUDFLARE_ACCOUNT_ID', requirement: 'optional', purpose: 'Cloudflare Workers AI image models (free tier)' },
   { key: 'CLOUDFLARE_API_TOKEN', requirement: 'optional', purpose: 'Cloudflare Workers AI token (Workers AI permission)' },
   { key: 'HF_TOKEN', requirement: 'optional', purpose: 'Hugging Face router — extra image models + video (beta)' },
+  { key: 'GOOGLE_CLIENT_ID', requirement: 'production', purpose: 'Google OAuth sign-in (client id)' },
+  { key: 'GOOGLE_CLIENT_SECRET', requirement: 'production', purpose: 'Google OAuth sign-in (client secret)' },
+  { key: 'ADMIN_EMAILS', requirement: 'optional', purpose: 'Comma-separated emails auto-promoted to admin on Google sign-in' },
   { key: 'ALLOWED_DEV_ORIGINS', requirement: 'optional', purpose: 'LAN origins for the dev server' },
 ];
 

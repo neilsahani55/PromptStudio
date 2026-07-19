@@ -26,6 +26,9 @@ if something isn't working.
 | `CLOUDFLARE_API_TOKEN` | Optional | Token with the "Workers AI" permission | Cloudflare → My Profile → API Tokens → "Workers AI" template |
 | `HF_TOKEN` | Optional | +2 image models and **video generation (beta)** via the HF router; small free monthly credits | https://huggingface.co/settings/tokens |
 | `BLOB_READ_WRITE_TOKEN` | Optional | Cross-device image gallery (Vercel Blob) | Vercel → Storage → Blob → Connect project |
+| `GOOGLE_CLIENT_ID` | **Prod** | Google sign-in (primary login; verified emails only) | Google Cloud Console → APIs & Services → Credentials → OAuth client ID (Web) |
+| `GOOGLE_CLIENT_SECRET` | **Prod** | Google sign-in client secret | Same OAuth client |
+| `ADMIN_EMAILS` | Optional | Comma-separated emails auto-promoted to admin on Google sign-in (default: project owner) | — |
 
 **Minimum to run:** `AUTH_SECRET` + `GOOGLE_GENAI_API_KEY`. Everything else is
 opt-in — but the database now requires `SUPABASE_DB_URL` (Supabase's free tier works for dev and prod).

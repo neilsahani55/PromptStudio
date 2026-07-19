@@ -88,8 +88,9 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await exec(
-      `INSERT INTO gallery_images (user_id, url, prompt, platform, model, aspect_ratio)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO gallery_images (user_id, user_name, url, prompt, platform, model, aspect_ratio)
+       VALUES (?, (SELECT name FROM users WHERE id = ?), ?, ?, ?, ?, ?)`,
+      userId,
       userId,
       url,
       prompt ?? null,

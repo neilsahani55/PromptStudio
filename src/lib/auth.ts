@@ -74,7 +74,9 @@ export async function logActivity(
   ip?: string
 ): Promise<void> {
   await exec(
-    'INSERT INTO activity_log (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)',
+    `INSERT INTO activity_log (user_id, user_name, action, details, ip_address)
+     VALUES (?, (SELECT name FROM users WHERE id = ?), ?, ?, ?)`,
+    userId,
     userId,
     action,
     details || null,
