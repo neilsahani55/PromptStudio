@@ -20,12 +20,12 @@ export async function GET(request: NextRequest) {
     const totalUsers = Number(totalUsersRow?.count ?? 0);
 
     const newTodayRow = await queryRow<{ count: number | bigint }>(
-      "SELECT COUNT(*) as count FROM users WHERE date(created_at) = date('now')"
+      'SELECT COUNT(*) as count FROM users WHERE created_at::date = current_date'
     );
     const newToday = Number(newTodayRow?.count ?? 0);
 
     const activeRow = await queryRow<{ count: number | bigint }>(
-      "SELECT COUNT(DISTINCT user_id) as count FROM activity_log WHERE created_at >= datetime('now', '-24 hours')"
+      "SELECT COUNT(DISTINCT user_id) as count FROM activity_log WHERE created_at >= now() - interval '24 hours'"
     );
     const activeUsers = Number(activeRow?.count ?? 0);
 

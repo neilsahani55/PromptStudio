@@ -87,7 +87,7 @@ export async function PATCH(request: NextRequest) {
 
     // Stamp the admin response time and clear user_viewed_at so the user sees
     // a fresh notification about this update.
-    updates.push("admin_responded_at = datetime('now')");
+    updates.push('admin_responded_at = now()');
     updates.push('user_viewed_at = NULL');
 
     params.push(id);

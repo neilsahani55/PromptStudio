@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
 
     const result = await exec(
       `UPDATE feedback
-       SET user_viewed_at = datetime('now')
+       SET user_viewed_at = now()
        WHERE user_id = ?
          AND admin_responded_at IS NOT NULL
          AND (user_viewed_at IS NULL OR admin_responded_at > user_viewed_at)`,

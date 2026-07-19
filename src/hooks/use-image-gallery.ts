@@ -49,9 +49,11 @@ function notify() {
 }
 
 function mapServerRow(r: any): GalleryImage {
+  // created_at may be ISO (Postgres timestamptz) or legacy "YYYY-MM-DD HH:MM:SS".
+  const parsed = r.created_at ? Date.parse(r.created_at) || Date.parse(r.created_at + 'Z') : NaN;
   return {
     id: String(r.id),
-    timestamp: r.created_at ? new Date(r.created_at + 'Z').getTime() || Date.now() : Date.now(),
+    timestamp: Number.isFinite(parsed) && parsed > 0 ? parsed : Date.now(),
     dataUri: r.url,
     prompt: r.prompt ?? '',
     platform: r.platform ?? '',

@@ -19,13 +19,13 @@ export async function GET(request: NextRequest) {
     let dateFilter = '';
     switch (period) {
       case 'today':
-        dateFilter = "AND date(ul.created_at) = date('now')";
+        dateFilter = 'AND ul.created_at::date = current_date';
         break;
       case 'week':
-        dateFilter = "AND ul.created_at >= datetime('now', '-7 days')";
+        dateFilter = "AND ul.created_at >= now() - interval '7 days'";
         break;
       case 'month':
-        dateFilter = "AND ul.created_at >= datetime('now', '-30 days')";
+        dateFilter = "AND ul.created_at >= now() - interval '30 days'";
         break;
       default:
         dateFilter = '';
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
     );
 
     const byDay = await queryRows<{ date: string; count: number | bigint }>(
-      `SELECT date(created_at) as date, COUNT(*) as count FROM usage_log ul WHERE 1=1 ${dateFilter} GROUP BY date(created_at) ORDER BY date ASC`
+      `SELECT created_at::date::text as date, COUNT(*) as count FROM usage_log ul WHERE 1=1 ${dateFilter} GROUP BY created_at::date ORDER BY date ASC`
     );
 
     const inputTypeRows = await queryRows<{ input_type: string; count: number | bigint }>(

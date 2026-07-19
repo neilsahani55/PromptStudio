@@ -15,8 +15,7 @@ if something isn't working.
 |---|---|---|---|
 | `AUTH_SECRET` | **Prod** (dev has insecure fallback) | Signs JWT session cookies | `node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"` |
 | `GOOGLE_GENAI_API_KEY` | **Always** | Default Gemini 2.5 Flash model | https://aistudio.google.com/apikey |
-| `TURSO_DATABASE_URL` | **Prod** | libSQL/Turso database URL (`libsql://…`) | https://turso.tech |
-| `TURSO_AUTH_TOKEN` | **Prod** | Turso database auth token | Turso dashboard |
+| `SUPABASE_DB_URL` | **Always** | Supabase Postgres connection string (Transaction pooler URI, port 6543) | https://supabase.com → Project Settings → Database |
 | `NVIDIA_API_KEY` | Optional | Extra text models **and** image generation | https://build.nvidia.com/ |
 | `NVIDIA_API_KEY_FALLBACK` | Optional | 2nd key, auto-used if the primary is rate-limited | build.nvidia.com (another account) |
 | `NVIDIA_NIM_BASE_URL` | Optional | NVIDIA text endpoint (default is fine) | — |
@@ -29,7 +28,7 @@ if something isn't working.
 | `BLOB_READ_WRITE_TOKEN` | Optional | Cross-device image gallery (Vercel Blob) | Vercel → Storage → Blob → Connect project |
 
 **Minimum to run:** `AUTH_SECRET` + `GOOGLE_GENAI_API_KEY`. Everything else is
-opt-in. With the Turso vars blank, the app uses a local SQLite file.
+opt-in — but the database now requires `SUPABASE_DB_URL` (Supabase's free tier works for dev and prod).
 
 ---
 
@@ -43,7 +42,7 @@ npm run dev            # http://localhost:9080
 ```
 
 - `.env.local` is git-ignored (`.env*`) — never commit it.
-- Leave `TURSO_*` blank locally; the DB is auto-created at `data/promptstudio.db`.
+- Set `SUPABASE_DB_URL` locally too (same Supabase project or a second free one). Tables auto-create on first boot.
 - First run seeds an admin: `admin@promptstudio.ai` / `Admin@123` → change it in `/admin/users`.
 
 ---
@@ -57,8 +56,7 @@ Project → **Settings → Environment Variables**. Add each for **Production**
 ```
 AUTH_SECRET             = <48-byte base64 string>
 GOOGLE_GENAI_API_KEY    = <your Gemini key>
-TURSO_DATABASE_URL      = libsql://<your-db>.turso.io
-TURSO_AUTH_TOKEN        = <your Turso token>
+SUPABASE_DB_URL         = postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/postgres
 ```
 
 **Optional (for NVIDIA models + image generation)**
@@ -82,8 +80,8 @@ running deployment).
    must use the exact variable names in the table above.
 2. **No quotes, no spaces** around `=` in `.env.local` (`KEY=value`, not `KEY = "value"`).
 3. **Rotate keys if they leak.** NVIDIA and Google let you revoke individual keys.
-4. **Prod needs a real DB.** Serverless platforms wipe the local SQLite file
-   between invocations — set `TURSO_*` in production.
+4. **The DB is Supabase Postgres everywhere.** Use the Transaction pooler URI
+   (port 6543) — it is the serverless-safe connection string.
 5. **Redeploy after env changes** on Vercel.
 6. **Check the startup log.** `[env] Config: …` shows what's active; `[env] ⚠ Missing …`
    flags problems.

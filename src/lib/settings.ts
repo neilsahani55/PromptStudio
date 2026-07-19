@@ -22,7 +22,7 @@ export async function getSetting(key: string): Promise<string> {
 
 export async function setSetting(key: string, value: string): Promise<void> {
   await exec(
-    `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))
+    `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, now())
      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
     key,
     value

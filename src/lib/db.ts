@@ -1,93 +1,101 @@
-import { createClient, type Client, type InArgs, type InValue } from '@libsql/client';
+import postgres from 'postgres';
 import bcryptjs from 'bcryptjs';
 
 // ─── Client bootstrap ───────────────────────────────────────────────────────
-// - Production: set TURSO_DATABASE_URL to libsql://... and TURSO_AUTH_TOKEN.
-// - Local dev: leave both blank to use an embedded SQLite file at data/promptstudio.db.
-const url = process.env.TURSO_DATABASE_URL || 'file:data/promptstudio.db';
-const authToken = process.env.TURSO_AUTH_TOKEN;
+// Supabase Postgres. Set SUPABASE_DB_URL to the "Transaction pooler" URI from
+// Supabase → Project Settings → Database → Connection string (port 6543),
+// e.g. postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/postgres
+// DATABASE_URL is honored as a fallback name.
+const url = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL || '';
+if (!url) {
+  console.warn('[db] SUPABASE_DB_URL is not set — database features will fail. See ENVIRONMENT.md.');
+}
 
-const client: Client = createClient({ url, authToken });
+const client = postgres(url, {
+  ssl: 'require',
+  max: 3,
+  idle_timeout: 20,
+  connect_timeout: 15,
+  // Required for Supabase's transaction pooler (no prepared statements).
+  prepare: false,
+  // Parse Postgres bigints (COUNT(*), IDENTITY ids) as JS numbers — our data
+  // volumes are far below Number.MAX_SAFE_INTEGER.
+  types: {
+    bigint: { to: 20, from: [20], parse: (x: string) => Number(x), serialize: (x: unknown) => String(x) },
+  },
+});
+
+// Translate legacy '?' placeholders (SQLite style, used throughout the app)
+// to Postgres $1..$n.
+function toPg(sqlText: string): string {
+  let i = 0;
+  return sqlText.replace(/\?/g, () => `$${++i}`);
+}
 
 // ─── Lazy schema init ───────────────────────────────────────────────────────
-// libSQL is async so we cannot run CREATE TABLE at module load. Instead we
-// memoize an init promise and every query helper awaits it before executing.
 let initPromise: Promise<void> | null = null;
 
 async function init(): Promise<void> {
   if (initPromise) return initPromise;
   initPromise = (async () => {
-    // Schema
-    await client.batch(
-      [
-        `CREATE TABLE IF NOT EXISTS users (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          name TEXT NOT NULL,
-          email TEXT UNIQUE NOT NULL,
-          password_hash TEXT NOT NULL,
-          role TEXT DEFAULT 'user',
-          status TEXT DEFAULT 'active' CHECK(status IN ('active', 'blocked')),
-          avatar_url TEXT,
-          created_at TEXT DEFAULT (datetime('now')),
-          last_login TEXT
-        )`,
-        `CREATE TABLE IF NOT EXISTS feedback (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-          type TEXT NOT NULL CHECK(type IN ('bug', 'suggestion', 'improvement')),
-          title TEXT NOT NULL,
-          message TEXT NOT NULL,
-          status TEXT DEFAULT 'new' CHECK(status IN ('new', 'reviewing', 'resolved', 'dismissed')),
-          admin_note TEXT,
-          created_at TEXT DEFAULT (datetime('now'))
-        )`,
-        `CREATE TABLE IF NOT EXISTS activity_log (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-          action TEXT NOT NULL,
-          details TEXT,
-          ip_address TEXT,
-          created_at TEXT DEFAULT (datetime('now'))
-        )`,
-        `CREATE TABLE IF NOT EXISTS settings (
-          key TEXT PRIMARY KEY,
-          value TEXT NOT NULL,
-          updated_at TEXT DEFAULT (datetime('now'))
-        )`,
-        `CREATE TABLE IF NOT EXISTS usage_log (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
-          model TEXT NOT NULL,
-          input_type TEXT DEFAULT 'text',
-          duration_ms INTEGER DEFAULT 0,
-          created_at TEXT DEFAULT (datetime('now'))
-        )`,
-        `CREATE TABLE IF NOT EXISTS gallery_images (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-          url TEXT NOT NULL,
-          prompt TEXT,
-          platform TEXT,
-          model TEXT,
-          aspect_ratio TEXT,
-          created_at TEXT DEFAULT (datetime('now'))
-        )`,
-      ],
-      'write'
-    );
-
-    // Idempotent migrations (add column if missing)
-    for (const [table, column, spec] of [
-      ['users', 'status', "TEXT DEFAULT 'active'"],
-      ['feedback', 'admin_responded_at', 'TEXT'],
-      ['feedback', 'user_viewed_at', 'TEXT'],
-    ] as const) {
-      try {
-        await client.execute(`SELECT ${column} FROM ${table} LIMIT 1`);
-      } catch {
-        await client.execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${spec}`);
-      }
-    }
+    await client.unsafe(`
+      CREATE TABLE IF NOT EXISTS users (
+        id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+        name TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        role TEXT DEFAULT 'user',
+        status TEXT DEFAULT 'active' CHECK (status IN ('active', 'blocked')),
+        avatar_url TEXT,
+        created_at TIMESTAMPTZ DEFAULT now(),
+        last_login TIMESTAMPTZ
+      );
+      CREATE TABLE IF NOT EXISTS feedback (
+        id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+        user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
+        type TEXT NOT NULL CHECK (type IN ('bug', 'suggestion', 'improvement')),
+        title TEXT NOT NULL,
+        message TEXT NOT NULL,
+        status TEXT DEFAULT 'new' CHECK (status IN ('new', 'reviewing', 'resolved', 'dismissed')),
+        admin_note TEXT,
+        created_at TIMESTAMPTZ DEFAULT now()
+      );
+      CREATE TABLE IF NOT EXISTS activity_log (
+        id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+        user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
+        action TEXT NOT NULL,
+        details TEXT,
+        ip_address TEXT,
+        created_at TIMESTAMPTZ DEFAULT now()
+      );
+      CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TIMESTAMPTZ DEFAULT now()
+      );
+      CREATE TABLE IF NOT EXISTS usage_log (
+        id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+        user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+        model TEXT NOT NULL,
+        input_type TEXT DEFAULT 'text',
+        duration_ms INTEGER DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT now()
+      );
+      CREATE TABLE IF NOT EXISTS gallery_images (
+        id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+        user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
+        url TEXT NOT NULL,
+        prompt TEXT,
+        platform TEXT,
+        model TEXT,
+        aspect_ratio TEXT,
+        created_at TIMESTAMPTZ DEFAULT now()
+      );
+      -- Idempotent column migrations
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active';
+      ALTER TABLE feedback ADD COLUMN IF NOT EXISTS admin_responded_at TIMESTAMPTZ;
+      ALTER TABLE feedback ADD COLUMN IF NOT EXISTS user_viewed_at TIMESTAMPTZ;
+    `);
 
     await seedSettings();
     await seedAdmin();
@@ -109,70 +117,74 @@ async function seedSettings(): Promise<void> {
     announcement_type: 'info',
   };
   for (const [key, value] of Object.entries(defaults)) {
-    await client.execute({
-      sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)',
-      args: [key, value],
-    });
+    await client.unsafe(
+      'INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING',
+      [key, value]
+    );
   }
 }
 
 async function seedAdmin(): Promise<void> {
-  const countRes = await client.execute('SELECT COUNT(*) AS count FROM users');
-  const count = Number((countRes.rows[0] as unknown as { count: number | bigint })?.count ?? 0);
+  const rows = await client.unsafe('SELECT COUNT(*) AS count FROM users');
+  const count = Number((rows[0] as unknown as { count: number | string })?.count ?? 0);
   if (count === 0) {
     const hash = bcryptjs.hashSync('Admin@123', 10);
-    await client.execute({
-      sql: 'INSERT INTO users (name, email, password_hash, role, status) VALUES (?, ?, ?, ?, ?)',
-      args: ['Admin', 'admin@promptstudio.ai', hash, 'admin', 'active'],
-    });
+    await client.unsafe(
+      'INSERT INTO users (name, email, password_hash, role, status) VALUES ($1, $2, $3, $4, $5)',
+      ['Admin', 'admin@promptstudio.ai', hash, 'admin', 'active']
+    );
     // eslint-disable-next-line no-console
     console.log('Default admin user created: admin@promptstudio.ai');
   }
 }
 
 // ─── Query helpers ──────────────────────────────────────────────────────────
-// Thin adapter so API routes read cleanly instead of repeating
-// `await client.execute({sql,args})` everywhere.
+// Same API the app has always used; '?' placeholders are translated to $n.
 
-export async function queryRows<T>(sql: string, ...args: InValue[]): Promise<T[]> {
+export type DbValue = string | number | boolean | null | undefined;
+
+export async function queryRows<T>(sql: string, ...args: DbValue[]): Promise<T[]> {
   await init();
-  const result = await client.execute({ sql, args });
-  return result.rows as unknown as T[];
+  const rows = await client.unsafe(toPg(sql), args as never[]);
+  return rows as unknown as T[];
 }
 
-export async function queryRow<T>(
-  sql: string,
-  ...args: InValue[]
-): Promise<T | null> {
+export async function queryRow<T>(sql: string, ...args: DbValue[]): Promise<T | null> {
   const rows = await queryRows<T>(sql, ...args);
   return rows[0] ?? null;
 }
 
+// Tables with an auto-generated id — INSERTs into these get RETURNING id
+// appended automatically so exec() can report lastInsertRowid like before.
+const ID_TABLE_INSERT = /^\s*insert\s+into\s+(users|feedback|activity_log|usage_log|gallery_images)\b/i;
+
 export async function exec(
   sql: string,
-  ...args: InValue[]
+  ...args: DbValue[]
 ): Promise<{ changes: number; lastInsertRowid: bigint | undefined }> {
   await init();
-  const result = await client.execute({ sql, args });
+  let text = toPg(sql);
+  const wantId = ID_TABLE_INSERT.test(text) && !/returning/i.test(text);
+  if (wantId) text += ' RETURNING id';
+  const rows = await client.unsafe(text, args as never[]);
+  const id = wantId && rows[0] != null ? (rows[0] as { id?: number | bigint }).id : undefined;
   return {
-    changes: Number(result.rowsAffected),
-    lastInsertRowid: result.lastInsertRowid,
+    changes: (rows as unknown as { count?: number }).count ?? rows.length,
+    lastInsertRowid: id === undefined || id === null ? undefined : BigInt(id),
   };
 }
 
-// Escape hatch for dynamic queries that can't fit the helpers above.
-export async function execute(sql: string, args: InArgs = []) {
+// Escape hatch for dynamic queries (args use $1..$n or none).
+export async function execute(sql: string, args: DbValue[] = []) {
   await init();
-  return client.execute({ sql, args });
+  return client.unsafe(toPg(sql), args as never[]);
 }
 
-// Convenience for the rare callers that still want the raw client.
-export async function getClient(): Promise<Client> {
+// Rare callers that want the raw postgres.js client.
+export async function getClient() {
   await init();
   return client;
 }
 
-// Back-compat: the old default export exposed better-sqlite3's sync API.
-// Importing `db` now returns the helpers instead.
 const db = { queryRows, queryRow, exec, execute, getClient };
 export default db;

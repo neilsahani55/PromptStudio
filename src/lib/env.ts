@@ -20,8 +20,7 @@ interface EnvSpec {
 export const ENV_SPECS: EnvSpec[] = [
   { key: 'AUTH_SECRET', requirement: 'production', purpose: 'Signs JWT session cookies' },
   { key: 'GOOGLE_GENAI_API_KEY', requirement: 'always', purpose: 'Default Gemini 2.5 Flash model' },
-  { key: 'TURSO_DATABASE_URL', requirement: 'production', purpose: 'Turso/libSQL database URL' },
-  { key: 'TURSO_AUTH_TOKEN', requirement: 'production', purpose: 'Turso database auth token' },
+  { key: 'SUPABASE_DB_URL', requirement: 'always', purpose: 'Supabase Postgres connection string (transaction pooler)' },
   { key: 'NVIDIA_API_KEY', requirement: 'optional', purpose: 'NVIDIA text + image models' },
   { key: 'NVIDIA_API_KEY_FALLBACK', requirement: 'optional', purpose: 'Fallback NVIDIA key (rate-limit resilience)' },
   { key: 'NVIDIA_NIM_BASE_URL', requirement: 'optional', purpose: 'NVIDIA base URL override' },
@@ -82,7 +81,7 @@ export function logEnvHealth(): void {
   }
 
   const nvidiaOn = isSet('NVIDIA_API_KEY');
-  const dbMode = isSet('TURSO_DATABASE_URL') ? 'Turso (remote)' : 'local SQLite file';
+  const dbMode = isSet('SUPABASE_DB_URL') || isSet('DATABASE_URL') ? 'Supabase (Postgres)' : 'NOT CONFIGURED';
   console.info(
     `[env] Config: DB=${dbMode} · Gemini=${isSet('GOOGLE_GENAI_API_KEY') ? 'on' : 'OFF'} · ` +
       `NVIDIA=${nvidiaOn ? 'on' : 'off'}${isSet('NVIDIA_API_KEY_FALLBACK') ? ' (+fallback)' : ''}`

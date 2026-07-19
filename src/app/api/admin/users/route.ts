@@ -29,7 +29,8 @@ export async function GET(request: NextRequest) {
     const params: any[] = [];
 
     if (search) {
-      query += ' WHERE u.name LIKE ? OR u.email LIKE ?';
+      // ILIKE = case-insensitive match (SQLite's LIKE was case-insensitive by default)
+      query += ' WHERE u.name ILIKE ? OR u.email ILIKE ?';
       params.push(`%${search}%`, `%${search}%`);
     }
 

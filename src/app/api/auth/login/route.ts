@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     }
 
     await exec(
-      "UPDATE users SET last_login = datetime('now') WHERE id = ?",
+      'UPDATE users SET last_login = now() WHERE id = ?',
       user.id
     );
 

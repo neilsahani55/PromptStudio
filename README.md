@@ -28,7 +28,7 @@ Built with Next.js 15, React 19, Google Genkit, and NVIDIA NIM.
 | AI orchestration | Google Genkit 1.20 |
 | Models | Gemini 2.5 Flash, NVIDIA NIM-hosted OpenAI-compatible models |
 | Auth | JWT (`jose`), bcryptjs password hashing, middleware-guarded routes |
-| Database | libSQL — local SQLite file in dev, [Turso](https://turso.tech) in production |
+| Database | [Supabase](https://supabase.com) Postgres (free tier) |
 | Validation | Zod |
 
 ### Routes
@@ -53,7 +53,7 @@ npm install
 
 # 2. Configure environment
 cp .env.example .env.local
-# then edit .env.local — at minimum set AUTH_SECRET and GOOGLE_GENAI_API_KEY
+# then edit .env.local — set AUTH_SECRET, GOOGLE_GENAI_API_KEY, SUPABASE_DB_URL
 
 # 3. Run
 npm run dev
@@ -61,7 +61,7 @@ npm run dev
 
 Open http://localhost:9080
 
-**First-run seed**: the SQLite database is auto-created at `data/promptstudio.db` on first boot. A default admin account is seeded:
+**First-run seed**: tables are auto-created in your Supabase database on first boot. A default admin account is seeded:
 
 - Email: `admin@promptstudio.ai`
 - Password: `Admin@123`
@@ -82,11 +82,10 @@ See [`.env.example`](.env.example) for the template and **[`ENVIRONMENT.md`](ENV
 | `NVIDIA_API_KEY_FLUX` |  | In-app Flux image generation |
 | `NVIDIA_API_KEY_SD35` |  | In-app Stable Diffusion 3.5 image generation |
 | `NVIDIA_NIM_BASE_URL` |  | Defaults to `https://integrate.api.nvidia.com/v1` |
-| `TURSO_DATABASE_URL` | prod | libSQL/Turso URL (`libsql://…`). Leave blank in dev to use a local SQLite file. [Sign up](https://turso.tech) |
-| `TURSO_AUTH_TOKEN` | prod | Auth token for the Turso database |
+| `SUPABASE_DB_URL` | yes | Supabase Postgres connection string (Transaction pooler URI). [Sign up free](https://supabase.com) |
 | `ALLOWED_DEV_ORIGINS` |  | Comma-separated LAN origins for Turbopack dev server |
 
-The app runs locally with only `AUTH_SECRET` + `GOOGLE_GENAI_API_KEY` — with the Turso vars blank, the database falls back to a local SQLite file at `data/promptstudio.db`. Everything else is opt-in.
+The app needs `AUTH_SECRET`, `GOOGLE_GENAI_API_KEY`, and `SUPABASE_DB_URL`. Everything else is opt-in.
 
 ---
 
@@ -107,7 +106,6 @@ npm run lint         # next lint
 
 ```
 .
-├── data/                       # Local SQLite database + prompt feedback log (gitignored)
 ├── public/                     # Static assets
 ├── src/
 │   ├── ai/
@@ -130,7 +128,7 @@ npm run lint         # next lint
 │   │   ├── theme-provider.tsx, theme-palette.tsx
 │   │   └── ...
 │   ├── hooks/                  # use-history, use-feedback-notifications, use-toast
-│   ├── lib/                    # auth, db (libSQL), utils, types
+│   ├── lib/                    # auth, db (Supabase Postgres), utils, types
 │   └── middleware.ts           # Route guards, JWT verification
 ├── .env.example                # Env template (commit this)
 ├── .env.local                  # Your secrets (never commit)
@@ -141,19 +139,19 @@ npm run lint         # next lint
 
 ## Deployment
 
-The database layer uses **libSQL**, so the app deploys cleanly to serverless platforms — the local SQLite file is only a dev convenience. For production, point it at a [Turso](https://turso.tech) database:
+The database is **Supabase Postgres** — serverless-friendly on every platform:
 
-1. Create a Turso database and generate an auth token.
-2. Set `TURSO_DATABASE_URL` (`libsql://…`) and `TURSO_AUTH_TOKEN` in your host's environment.
+1. Create a free project at [supabase.com](https://supabase.com).
+2. Set `SUPABASE_DB_URL` (Project Settings → Database → Connection string → **Transaction pooler** URI, port 6543) in your host's environment.
 3. Set `AUTH_SECRET` and `GOOGLE_GENAI_API_KEY` (plus any optional NVIDIA keys).
 4. Deploy. The schema and default admin are created automatically on first boot.
 
 | Platform | Works? | Notes |
 |---|:---:|---|
-| **Vercel** + Turso | yes | Recommended — zero-config serverless + libSQL |
-| **Netlify** + Turso | yes | Same approach as Vercel |
-| **Railway / Render / Fly.io** | yes | Turso, or a persistent volume for a local SQLite file |
-| **Self-hosted VPS** | yes | Turso or a local file both work |
+| **Vercel** + Supabase | yes | Recommended — zero-config serverless + Postgres |
+| **Netlify** + Supabase | yes | Same approach as Vercel |
+| **Railway / Render / Fly.io** | yes | Same Supabase connection string |
+| **Self-hosted VPS** | yes | Same Supabase connection string |
 
 ---
 
