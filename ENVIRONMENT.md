@@ -1,0 +1,85 @@
+# Environment Variables — Setup Guide
+
+This is the single source of truth for configuring PromptStudio. Keep it in
+sync with [`.env.example`](.env.example) and [`src/lib/env.ts`](src/lib/env.ts).
+
+On server startup the app logs a one-line config summary and **warns** (never
+crashes) if a required variable is missing — check your terminal / Vercel logs
+if something isn't working.
+
+---
+
+## The complete variable list
+
+| Variable | Required? | Purpose | Where to get it |
+|---|---|---|---|
+| `AUTH_SECRET` | **Prod** (dev has insecure fallback) | Signs JWT session cookies | `node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"` |
+| `GOOGLE_GENAI_API_KEY` | **Always** | Default Gemini 2.5 Flash model | https://aistudio.google.com/apikey |
+| `TURSO_DATABASE_URL` | **Prod** | libSQL/Turso database URL (`libsql://…`) | https://turso.tech |
+| `TURSO_AUTH_TOKEN` | **Prod** | Turso database auth token | Turso dashboard |
+| `NVIDIA_API_KEY` | Optional | Extra text models **and** image generation | https://build.nvidia.com/ |
+| `NVIDIA_API_KEY_FALLBACK` | Optional | 2nd key, auto-used if the primary is rate-limited | build.nvidia.com (another account) |
+| `NVIDIA_NIM_BASE_URL` | Optional | NVIDIA text endpoint (default is fine) | — |
+| `NVIDIA_FLUX_URL` | Optional | Override Flux image endpoint | — |
+| `NVIDIA_SD_URL` | Optional | Override SD image endpoint | — |
+| `ALLOWED_DEV_ORIGINS` | Optional | LAN origins for the dev server | — |
+
+**Minimum to run:** `AUTH_SECRET` + `GOOGLE_GENAI_API_KEY`. Everything else is
+opt-in. With the Turso vars blank, the app uses a local SQLite file.
+
+---
+
+## Local setup
+
+```bash
+cp .env.example .env.local
+# edit .env.local — at minimum set AUTH_SECRET and GOOGLE_GENAI_API_KEY
+npm install
+npm run dev            # http://localhost:9080
+```
+
+- `.env.local` is git-ignored (`.env*`) — never commit it.
+- Leave `TURSO_*` blank locally; the DB is auto-created at `data/promptstudio.db`.
+- First run seeds an admin: `admin@promptstudio.ai` / `Admin@123` → change it in `/admin/users`.
+
+---
+
+## Vercel (production) setup
+
+Project → **Settings → Environment Variables**. Add each for **Production**
+(and Preview/Development if you want):
+
+**Required**
+```
+AUTH_SECRET             = <48-byte base64 string>
+GOOGLE_GENAI_API_KEY    = <your Gemini key>
+TURSO_DATABASE_URL      = libsql://<your-db>.turso.io
+TURSO_AUTH_TOKEN        = <your Turso token>
+```
+
+**Optional (for NVIDIA models + image generation)**
+```
+NVIDIA_API_KEY          = <your NVIDIA key>
+NVIDIA_API_KEY_FALLBACK = <optional 2nd key>
+```
+
+After changing variables, **redeploy** (Vercel does not apply env changes to a
+running deployment).
+
+> **Migration note:** `NVIDIA_API_KEY_FLUX` and `NVIDIA_API_KEY_SD35` are no
+> longer used — one `NVIDIA_API_KEY` now powers text + image. You can delete
+> those two old variables from Vercel.
+
+---
+
+## Rules of thumb (so it doesn't fail later)
+
+1. **Same names, everywhere.** Local `.env.local`, Vercel, and any other host
+   must use the exact variable names in the table above.
+2. **No quotes, no spaces** around `=` in `.env.local` (`KEY=value`, not `KEY = "value"`).
+3. **Rotate keys if they leak.** NVIDIA and Google let you revoke individual keys.
+4. **Prod needs a real DB.** Serverless platforms wipe the local SQLite file
+   between invocations — set `TURSO_*` in production.
+5. **Redeploy after env changes** on Vercel.
+6. **Check the startup log.** `[env] Config: …` shows what's active; `[env] ⚠ Missing …`
+   flags problems.

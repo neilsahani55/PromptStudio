@@ -1,6 +1,11 @@
 import {genkit, z, GenerationCommonConfigSchema} from 'genkit';
 import {googleAI} from '@genkit-ai/google-genai';
 import {openAI} from 'genkitx-openai';
+import {logEnvHealth} from '@/lib/env';
+
+// One-time env sanity check on server startup — logs a clear summary and warns
+// about anything required-but-missing, so problems show up in logs immediately.
+logEnvHealth();
 
 const OpenAiConfigSchema = GenerationCommonConfigSchema.extend({
   frequencyPenalty: z.number().min(-2).max(2).optional(),

@@ -72,7 +72,7 @@ Open http://localhost:9080
 
 ## Environment variables
 
-See [`.env.example`](.env.example) for the complete template.
+See [`.env.example`](.env.example) for the template and **[`ENVIRONMENT.md`](ENVIRONMENT.md) for the full setup guide** (local + Vercel).
 
 | Variable | Required | Purpose |
 |---|:---:|---|
