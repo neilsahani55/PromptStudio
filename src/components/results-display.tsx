@@ -16,70 +16,12 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { QuickFixChips, FixType } from "@/components/quick-fix-chips";
 import { useImageGallery } from "@/hooks/use-image-gallery";
 import { MediaStudio } from "@/components/media-studio";
-
-// NVIDIA image generation via our API route. When NVIDIA can't finish within
-// the route's window it returns { pending, reqId }; we then poll the status
-// endpoint — each poll is its own short request, so total generation time is
-// not limited by any single serverless invocation's 60s cap.
-async function pollForImage(reqId: string): Promise<{ url: string | null; base64: string | null }> {
-  const deadline = Date.now() + 240_000; // up to ~4 minutes total
-  while (Date.now() < deadline) {
-    await new Promise((r) => setTimeout(r, 2500));
-    let pres: Response;
-    try {
-      pres = await fetch(`/api/generate-image/status?reqId=${encodeURIComponent(reqId)}`, {
-        credentials: 'same-origin',
-      });
-    } catch {
-      continue; // transient network blip — keep polling
-    }
-    let pdata: any = null;
-    try { pdata = JSON.parse(await pres.text()); } catch { continue; }
-    if (pdata?.pending) continue;
-    if (!pres.ok || pdata?.error) {
-      const parts = [pdata?.error || 'Generation failed', pdata?.detail, pdata?.hint].filter(Boolean);
-      throw new Error(parts.join(' — '));
-    }
-    if (pdata?.image) return pdata.image;
-  }
-  throw new Error('Image generation timed out after 4 minutes. Try the fast Flux model or a simpler prompt.');
-}
-
-// Calls the NVIDIA-backed API route and resolves the async-polling path.
-async function generateViaNvidia(
-  model: string,
-  prompt: string,
-  aspectRatio: string,
-  stylePreset?: string
-): Promise<{ imageUrl: string; usedModel: string }> {
-  const res = await fetch('/api/generate-image', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model, prompt, aspectRatio, stylePreset }),
-  });
-  const text = await res.text();
-  let data: any = null;
-  try { data = JSON.parse(text); } catch { throw new Error(`Server Error (${res.status})`); }
-
-  if (res.ok && data?.pending && data?.reqId) {
-    const image = await pollForImage(data.reqId);
-    data = { ...data, image };
-  }
-
-  if (!res.ok || !data?.image) {
-    const toStr = (v: unknown): string | null => {
-      if (v == null) return null;
-      if (typeof v === 'string') return v;
-      try { return JSON.stringify(v); } catch { return String(v); }
-    };
-    const parts = [toStr(data?.error) || 'Generation failed', toStr(data?.detail), toStr(data?.hint)].filter(Boolean);
-    throw new Error(parts.join(' — '));
-  }
-
-  const imageUrl = data.image.url || data.image.base64;
-  if (!imageUrl) throw new Error('No image data received');
-  return { imageUrl, usedModel: data.model || model };
-}
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { styleProfiles, BrandStyle } from "@/ai/utils/style-profiles";
 
 const copyToClipboard = (text: string, toast: (options: any) => void, onCopySuccess?: () => void) => {
@@ -510,40 +452,6 @@ function MultiPlatformPrompt({
   const [selectedStyle, setSelectedStyle] = useState<BrandStyle>('modern_saas_3d');
   const [showComparison, setShowComparison] = useState(false);
 
-  // Generation State
-  const [genState, setGenState] = useState<Record<string, 'idle' | 'loading' | 'done' | 'error'>>({});
-  const [generatedImages, setGeneratedImages] = useState<Record<string, string | null>>({});
-  const [genErrors, setGenErrors] = useState<Record<string, string | null>>({});
-
-  // ─── Image model comparison (Flux vs SD 3.5) ───────────────────────────────
-  const handleGenerate = async (platform: string, prompt: string) => {
-    setGenState(prev => ({ ...prev, [platform]: 'loading' }));
-    setGenErrors(prev => ({ ...prev, [platform]: null }));
-
-    try {
-        const aspectRatio = qualityMetrics?.suggestedAspectRatio || '16:9';
-        // The "flux" tab uses the fast distilled model; other tabs use the HQ one.
-        const model = platform === 'flux' ? 'flux' : 'sd35';
-        const { imageUrl, usedModel } = await generateViaNvidia(model, prompt, aspectRatio, selectedStyle);
-
-        setGeneratedImages(prev => ({ ...prev, [platform]: imageUrl }));
-        setGenState(prev => ({ ...prev, [platform]: 'done' }));
-
-        // Persist to the gallery (base64 for permanence).
-        addImage({ dataUri: imageUrl, prompt, platform, model: usedModel, aspectRatio });
-
-        toast({
-            title: "Image Generated!",
-            description: `Created with ${model === 'flux' ? 'FLUX.2 Klein' : 'FLUX.1 Dev'} on NVIDIA.`
-        });
-
-    } catch (e: any) {
-        console.error("Generation error:", e);
-        setGenErrors(prev => ({ ...prev, [platform]: e.message || "Failed to generate image" }));
-        setGenState(prev => ({ ...prev, [platform]: 'error' }));
-    }
-  };
-
   const handleFeedback = async (rating: number) => {
     if (feedbackStatus !== 'none') return;
 
@@ -808,107 +716,116 @@ function MultiPlatformPrompt({
         </Card>
       )}
 
-      {/* Platform Tabs (hidden during comparison) */}
+      {/* ─── Primary workflow: Master Prompt → Media Studio ─────────────── */}
       {currentPrompts && !showComparison && (
-      <Tabs defaultValue="master" className="w-full">
-        <TabsList className={`grid w-full p-1 bg-muted/50 ${designBrief ? 'grid-cols-6' : 'grid-cols-5'}`}>
-          <TabsTrigger value="master" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">
-            {getPlatformIcon('master')}
-            <span className="hidden sm:inline">{getPlatformName('master')}</span>
-          </TabsTrigger>
-          {Object.keys(currentPrompts).map((platform) => (
-            <TabsTrigger key={platform} value={platform} className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">
-              {getPlatformIcon(platform)}
-              <span className="hidden sm:inline">{getPlatformName(platform)}</span>
-            </TabsTrigger>
-          ))}
-          {designBrief && (
-            <TabsTrigger value="design-brief" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">
-                <Palette className="w-4 h-4" />
-                <span className="hidden sm:inline">Design Brief</span>
-            </TabsTrigger>
-          )}
-        </TabsList>
-
-        <TabsContent value="master" className="mt-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <div className="mb-2">
-                <Alert className="bg-primary/5 border-primary/20">
-                    <Globe className="h-4 w-4 text-primary" />
-                    <AlertTitle className="text-sm font-semibold text-primary">Universal Format</AlertTitle>
-                    <AlertDescription className="text-xs text-muted-foreground">
-                        Works in any modern image model (Gemini, DALL-E, Midjourney, SD, Flux, etc.)
-                    </AlertDescription>
-                </Alert>
+      <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+        {/* Master prompt hero card */}
+        <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 via-card to-card p-4 md:p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+              <Globe className="w-4 h-4 text-primary" />
             </div>
-            <PromptDisplay
-              title="Master Universal Prompt"
-              content={masterPrompt || "Master prompt not available."}
-              onCopy={() => copyToClipboard(masterPrompt || "", toast)}
-            />
+            <div>
+              <p className="text-sm font-bold">Master Prompt</p>
+              <p className="text-[11px] text-muted-foreground">
+                Universal format — powers image &amp; video generation below, or paste into any AI model
+              </p>
+            </div>
+          </div>
 
-            {onFix && activeVariantIndex === -1 && (
-              <QuickFixChips onFix={onFix} isLoading={isFixing} />
-            )}
+          <PromptDisplay
+            title="Master Universal Prompt"
+            content={masterPrompt || "Master prompt not available."}
+            onCopy={() => copyToClipboard(masterPrompt || "", toast)}
+          />
 
-            {/* Media Studio: multi-model image + video generation */}
-            <MediaStudio
-              masterPrompt={masterPrompt || ""}
-              aspectRatio={qualityMetrics?.suggestedAspectRatio || "16:9"}
-            />
-        </TabsContent>
+          {onFix && activeVariantIndex === -1 && (
+            <QuickFixChips onFix={onFix} isLoading={isFixing} />
+          )}
 
-        {Object.entries(currentPrompts).map(([platform, prompt]) => (
-          <TabsContent key={platform} value={platform} className="mt-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <PromptDisplay
-              title={`${getPlatformName(platform)} Prompt`}
-              content={prompt as string}
-              onCopy={() => copyToClipboard(prompt as string, toast)}
-              platform={platform}
-              onGenerate={() => handleGenerate(platform, prompt as string)}
-              isGenerating={genState[platform] === 'loading'}
-              generatedImage={generatedImages[platform]}
-              generationError={genErrors[platform]}
-            />
-          </TabsContent>
-        ))}
+          {/* Media Studio: multi-model image + video generation */}
+          <MediaStudio
+            masterPrompt={masterPrompt || ""}
+            aspectRatio={qualityMetrics?.suggestedAspectRatio || "16:9"}
+          />
+        </div>
 
-        {designBrief && (
-            <TabsContent value="design-brief" className="mt-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                <div className="grid gap-4 md:grid-cols-2">
-                    <Card className="bg-muted/30">
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-semibold uppercase text-muted-foreground flex items-center gap-2">
-                                <Palette className="w-4 h-4" /> Palette
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-sm">{designBrief.primaryColorPalette}</p>
-                        </CardContent>
-                    </Card>
-                    <Card className="bg-muted/30">
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-semibold uppercase text-muted-foreground flex items-center gap-2">
-                                <FileText className="w-4 h-4" /> Typography
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-sm">{designBrief.typographySummary}</p>
-                        </CardContent>
-                    </Card>
-                    <Card className="bg-muted/30 col-span-2">
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-semibold uppercase text-muted-foreground flex items-center gap-2">
-                                <Layers className="w-4 h-4" /> Component Style
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-sm">{designBrief.componentStyle}</p>
-                        </CardContent>
-                    </Card>
+        {/* Platform-specific prompts — compact, copy-oriented */}
+        <Accordion type="single" collapsible className="rounded-xl border border-border bg-card px-4">
+          <AccordionItem value="platform-prompts" className="border-b-0">
+            <AccordionTrigger className="text-sm font-semibold hover:no-underline py-4">
+              <span className="flex items-center gap-2 flex-wrap">
+                <Layers className="w-4 h-4 text-primary" />
+                Platform-specific prompts
+                <span className="text-[10px] font-normal text-muted-foreground">
+                  Midjourney · DALL-E 3 · Stable Diffusion · Flux — copy into external tools
+                </span>
+              </span>
+            </AccordionTrigger>
+            <AccordionContent className="space-y-5 pb-4">
+              {Object.entries(currentPrompts).map(([platform, prompt]) => (
+                <div key={platform}>
+                  <div className="flex items-center gap-1.5 mb-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    {getPlatformIcon(platform)}
+                    {getPlatformName(platform)}
+                  </div>
+                  <PromptDisplay
+                    title={`${getPlatformName(platform)} Prompt`}
+                    content={prompt as string}
+                    onCopy={() => copyToClipboard(prompt as string, toast)}
+                    platform={platform}
+                  />
                 </div>
-            </TabsContent>
-        )}
-      </Tabs>
+              ))}
+            </AccordionContent>
+          </AccordionItem>
+
+          {designBrief && (
+            <AccordionItem value="design-brief" className="border-t border-border/60 border-b-0">
+              <AccordionTrigger className="text-sm font-semibold hover:no-underline py-4">
+                <span className="flex items-center gap-2">
+                  <Palette className="w-4 h-4 text-primary" />
+                  Design Brief
+                </span>
+              </AccordionTrigger>
+              <AccordionContent className="pb-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Card className="bg-muted/30">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-semibold uppercase text-muted-foreground flex items-center gap-2">
+                        <Palette className="w-4 h-4" /> Palette
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm">{designBrief.primaryColorPalette}</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-muted/30">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-semibold uppercase text-muted-foreground flex items-center gap-2">
+                        <FileText className="w-4 h-4" /> Typography
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm">{designBrief.typographySummary}</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-muted/30 md:col-span-2">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-semibold uppercase text-muted-foreground flex items-center gap-2">
+                        <Layers className="w-4 h-4" /> Component Style
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm">{designBrief.componentStyle}</p>
+                    </CardContent>
+                  </Card>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          )}
+        </Accordion>
+      </div>
       )}
 
       {/* Iterative Refinement */}
