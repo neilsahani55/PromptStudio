@@ -76,30 +76,36 @@ const generateImageSchema = z.object({
 
 // Google image-generation fallback (uses the existing GOOGLE_GENAI_API_KEY).
 // Called when NVIDIA is too slow or unavailable, if the budget still allows.
-async function tryGoogleFallback(prompt: string, overallDeadline: number): Promise<NextResponse | null> {
-  if (!process.env.GOOGLE_GENAI_API_KEY) return null;
+async function tryGoogleFallback(
+  prompt: string,
+  overallDeadline: number
+): Promise<{ response?: NextResponse; error?: string }> {
+  if (!process.env.GOOGLE_GENAI_API_KEY) return { error: 'no Google key configured' };
   const remaining = overallDeadline - Date.now();
-  if (remaining < 12_000) return null; // not enough time left to try
+  if (remaining < 12_000) return { error: 'not enough time left for a fallback' };
   try {
     const result = await Promise.race([
       generateImage({ prompt }),
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('GOOGLE_TIMEOUT')), Math.max(6_000, remaining - 2_000))
+        setTimeout(() => reject(new Error('Google image generation timed out')), Math.max(6_000, remaining - 2_000))
       ),
     ]);
     const dataUri = (result as { imageUrl?: string })?.imageUrl;
-    if (!dataUri) return null;
-    return NextResponse.json({
-      model: 'google',
-      requestedModel: 'google',
-      fallbackUsed: true,
-      prompt,
-      params: {},
-      image: { url: null, base64: dataUri },
-    });
+    if (!dataUri) return { error: 'Google returned no image' };
+    return {
+      response: NextResponse.json({
+        model: 'google',
+        requestedModel: 'google',
+        fallbackUsed: true,
+        prompt,
+        params: {},
+        image: { url: null, base64: dataUri },
+      }),
+    };
   } catch (e) {
-    console.warn('Google image fallback failed:', e);
-    return null;
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn('Google image fallback failed:', msg);
+    return { error: msg };
   }
 }
 
@@ -253,13 +259,13 @@ export async function POST(req: NextRequest) {
       }
 
       // NVIDIA failed — try Google image generation before giving up.
-      const gErr = await tryGoogleFallback(prompt, overallDeadline);
-      if (gErr) return gErr;
+      const g = await tryGoogleFallback(prompt, overallDeadline);
+      if (g.response) return g.response;
 
       return NextResponse.json(
         {
           error: 'Image generation failed.',
-          detail,
+          detail: g.error ? `${detail ?? 'NVIDIA error'} · Google fallback: ${g.error}` : detail,
           hint,
           upstreamStatus: res.status,
         },
@@ -380,12 +386,14 @@ export async function POST(req: NextRequest) {
     if (err?.name === 'AbortError' || err?.message === 'IMAGE_DEADLINE_EXCEEDED') {
       console.error('NVIDIA image generation timed out — attempting Google fallback.');
       const g = await tryGoogleFallback(promptForFallback, overallDeadline);
-      if (g) return g;
+      if (g.response) return g.response;
       return NextResponse.json(
         {
           error: 'Image generation timed out.',
-          detail: 'The image model took too long to respond.',
-          hint: 'NVIDIA free-tier image models can be slow to warm up. Try again in a moment, or simplify the prompt.',
+          detail: g.error
+            ? `NVIDIA timed out and the Google fallback failed → ${g.error}`
+            : 'The image model took too long to respond.',
+          hint: 'On Vercel Hobby the function limit is 60s. If the Google fallback is failing, the detail above shows why (usually a model-access or quota issue).',
         },
         { status: 504 }
       );

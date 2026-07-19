@@ -21,10 +21,13 @@ const GenerateImageOutputSchema = z.object({
 });
 export type GenerateImageOutput = z.infer<typeof GenerateImageOutputSchema>;
 
-// Candidate Gemini image models, tried in order until one returns an image.
-const GOOGLE_IMAGE_MODELS: { ref: any; config: Record<string, unknown> }[] = [
-  { ref: googleAI.model('gemini-2.5-flash-image'), config: { responseModalities: ['IMAGE'] } },
-  { ref: googleAI.model('gemini-2.0-flash-preview-image-generation'), config: { responseModalities: ['TEXT', 'IMAGE'] } },
+// Candidate Gemini image models + configs, tried in order until one returns an
+// image. Different keys/regions expose different ids, so we try several.
+const GOOGLE_IMAGE_MODELS: { name: string; config?: Record<string, unknown> }[] = [
+  { name: 'gemini-2.5-flash-image', config: { responseModalities: ['IMAGE'] } },
+  { name: 'gemini-2.5-flash-image-preview', config: { responseModalities: ['IMAGE'] } },
+  { name: 'gemini-2.0-flash-preview-image-generation', config: { responseModalities: ['TEXT', 'IMAGE'] } },
+  { name: 'gemini-2.0-flash-exp', config: { responseModalities: ['TEXT', 'IMAGE'] } },
 ];
 
 export async function generateImage(input: GenerateImageInput): Promise<GenerateImageOutput> {
@@ -38,28 +41,24 @@ const generateImageFlow = ai.defineFlow(
     outputSchema: GenerateImageOutputSchema,
   },
   async (input) => {
-    let lastError: unknown = null;
+    const errors: string[] = [];
     for (const cand of GOOGLE_IMAGE_MODELS) {
       try {
         const res = await ai.generate({
-          model: cand.ref,
+          model: googleAI.model(cand.name),
           prompt: input.prompt,
           config: cand.config as any,
         });
         const url = res.media?.url;
         if (url) return { imageUrl: url };
+        errors.push(`${cand.name}: no image in response`);
       } catch (e) {
-        lastError = e;
+        const msg = e instanceof Error ? e.message.slice(0, 140) : String(e);
+        errors.push(`${cand.name}: ${msg}`);
         // eslint-disable-next-line no-console
-        console.warn(
-          `Google image model failed:`,
-          e instanceof Error ? e.message.slice(0, 160) : e
-        );
+        console.warn(`Google image model ${cand.name} failed:`, msg);
       }
     }
-    throw new Error(
-      'Google image generation failed: ' +
-        (lastError instanceof Error ? lastError.message : 'no image returned')
-    );
+    throw new Error(`Google image generation failed — ${errors.join(' | ')}`);
   }
 );
