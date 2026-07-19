@@ -557,9 +557,12 @@ function MultiPlatformPrompt({
         });
 
         if (data.fallbackUsed) {
+            const usedLabel = data.model === 'google' ? 'Google' : data.model === 'flux' ? 'Flux' : data.model;
             toast({
-                title: "Image Generated (via Flux)",
-                description: "Stable Diffusion isn't enabled on your NVIDIA account, so we used Flux instead."
+                title: `Image Generated (via ${usedLabel})`,
+                description: data.model === 'google'
+                  ? "NVIDIA was slow to respond, so we generated with Google instead."
+                  : "The requested model wasn't available, so we used a fallback."
             });
         } else {
             toast({

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { styleProfiles, BrandStyle } from '@/ai/utils/style-profiles';
 import { verifyToken } from '@/lib/auth';
+import { generateImage } from '@/ai/flows/generate-image';
 
 // Image models are slow — claim the full serverless budget. Route handlers do
 // NOT inherit the layout's maxDuration, so it must be declared here or the
@@ -73,7 +74,42 @@ const generateImageSchema = z.object({
   stylePreset: z.string().optional(),
 });
 
+// Google image-generation fallback (uses the existing GOOGLE_GENAI_API_KEY).
+// Called when NVIDIA is too slow or unavailable, if the budget still allows.
+async function tryGoogleFallback(prompt: string, overallDeadline: number): Promise<NextResponse | null> {
+  if (!process.env.GOOGLE_GENAI_API_KEY) return null;
+  const remaining = overallDeadline - Date.now();
+  if (remaining < 12_000) return null; // not enough time left to try
+  try {
+    const result = await Promise.race([
+      generateImage({ prompt }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('GOOGLE_TIMEOUT')), Math.max(6_000, remaining - 2_000))
+      ),
+    ]);
+    const dataUri = (result as { imageUrl?: string })?.imageUrl;
+    if (!dataUri) return null;
+    return NextResponse.json({
+      model: 'google',
+      requestedModel: 'google',
+      fallbackUsed: true,
+      prompt,
+      params: {},
+      image: { url: null, base64: dataUri },
+    });
+  } catch (e) {
+    console.warn('Google image fallback failed:', e);
+    return null;
+  }
+}
+
 export async function POST(req: NextRequest) {
+  // Overall budget (< maxDuration). When a Google key is present, give NVIDIA a
+  // tighter slice so there is time left to fall back to Google on a timeout.
+  const overallDeadline = Date.now() + 56_000;
+  const hasGoogle = !!process.env.GOOGLE_GENAI_API_KEY;
+  const nvidiaDeadline = Date.now() + (hasGoogle ? 38_000 : 55_000);
+  let promptForFallback = '';
   try {
     const rawBody = await req.json();
 
@@ -103,8 +139,10 @@ export async function POST(req: NextRequest) {
     }
 
     const { model: requestedModel, negativePrompt, aspectRatio, seed, stylePreset } = parsed.data;
-    // Sanitize prompt before sending to NVIDIA to avoid content-filter false positives
-    const prompt = sanitizePromptForNvidia(parsed.data.prompt);
+    // Sanitize + cap length. Very long, weighted prompts slow NVIDIA inference
+    // and the models truncate internally anyway.
+    const prompt = sanitizePromptForNvidia(parsed.data.prompt).slice(0, 1500);
+    promptForFallback = prompt;
 
     // Try the requested model; if it's SD and returns 404 (endpoint not in
     // user's NVIDIA function catalog), transparently fall back to Flux so the
@@ -124,12 +162,10 @@ export async function POST(req: NextRequest) {
       console.log(`Sending request to ${nim.url} for model ${model}`);
     }
 
-    // Shared time budget across the (possibly two) NVIDIA calls, so we return a
-    // clean error before Vercel kills the function with a raw 504. Leaves
-    // headroom under maxDuration (60s) for JSON parsing and the response.
-    const deadline = Date.now() + 52_000;
+    // Per-NVIDIA-call abort budget. If exceeded we still have time under
+    // overallDeadline to fall back to Google image generation.
     const fetchOnce = (url: string, payload: unknown, key: string) => {
-      const remaining = deadline - Date.now();
+      const remaining = nvidiaDeadline - Date.now();
       if (remaining <= 2_000) {
         return Promise.reject(new Error('IMAGE_DEADLINE_EXCEEDED'));
       }
@@ -213,6 +249,10 @@ export async function POST(req: NextRequest) {
       } else if (res.status === 429) {
         hint = `NVIDIA rate limit exceeded for model '${model}'. Wait a minute and try again.`;
       }
+
+      // NVIDIA failed — try Google image generation before giving up.
+      const gErr = await tryGoogleFallback(prompt, overallDeadline);
+      if (gErr) return gErr;
 
       return NextResponse.json(
         {
@@ -336,12 +376,14 @@ export async function POST(req: NextRequest) {
     // Our abort timer or the shared deadline fired — return a clean, actionable
     // error instead of letting Vercel emit a raw 504 with no explanation.
     if (err?.name === 'AbortError' || err?.message === 'IMAGE_DEADLINE_EXCEEDED') {
-      console.error('Image generation timed out (>50s).');
+      console.error('NVIDIA image generation timed out — attempting Google fallback.');
+      const g = await tryGoogleFallback(promptForFallback, overallDeadline);
+      if (g) return g;
       return NextResponse.json(
         {
           error: 'Image generation timed out.',
-          detail: 'The image model took too long to respond (over ~50s).',
-          hint: 'Flux (Schnell) is the fastest option — try it, simplify the prompt, or use a standard aspect ratio. SD 3.5 Large is the slowest model.',
+          detail: 'The image model took too long to respond.',
+          hint: 'NVIDIA free-tier image models can be slow to warm up. Try again in a moment, or simplify the prompt.',
         },
         { status: 504 }
       );
