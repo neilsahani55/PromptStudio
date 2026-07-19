@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { exec, queryRow, queryRows } from '@/lib/db';
 import { verifyToken, logActivity } from '@/lib/auth';
+import { sendFeedbackEmail } from '@/lib/mailer';
+
+export const runtime = 'nodejs';
 
 async function getAuthUser(request: NextRequest) {
   const token = request.cookies.get('auth-token')?.value;
@@ -50,6 +53,21 @@ export async function POST(request: NextRequest) {
       request.headers.get('x-real-ip') ||
       'unknown';
     await logActivity(auth.userId, 'feedback_submitted', `Submitted ${type}: ${title}`, ip);
+
+    // Email notification (best-effort — never fails the request). Awaited
+    // because serverless functions can't reliably finish fire-and-forget work.
+    const submitter = await queryRow<{ name: string; email: string }>(
+      'SELECT name, email FROM users WHERE id = ?',
+      auth.userId
+    );
+    await sendFeedbackEmail({
+      id: Number(result.lastInsertRowid ?? 0),
+      type,
+      title: title.trim(),
+      message: message.trim(),
+      userName: submitter?.name,
+      userEmail: submitter?.email,
+    });
 
     return NextResponse.json({ feedback }, { status: 201 });
   } catch (error) {

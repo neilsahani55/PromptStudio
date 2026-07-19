@@ -29,6 +29,10 @@ if something isn't working.
 | `GOOGLE_CLIENT_ID` | **Prod** | Google sign-in (primary login; verified emails only) | Google Cloud Console → APIs & Services → Credentials → OAuth client ID (Web) |
 | `GOOGLE_CLIENT_SECRET` | **Prod** | Google sign-in client secret | Same OAuth client |
 | `ADMIN_EMAILS` | Optional | Comma-separated emails auto-promoted to admin on Google sign-in (default: project owner) | — |
+| `SMTP_USER` | Optional | Gmail address that sends feedback notifications | — |
+| `SMTP_PASS` | Optional | Gmail **App Password** (needs 2-Step Verification) | https://myaccount.google.com/apppasswords |
+| `SMTP_HOST` / `SMTP_PORT` | Optional | SMTP server (defaults: smtp.gmail.com / 465) | — |
+| `FEEDBACK_EMAIL_TO` / `FEEDBACK_EMAIL_CC` | Optional | Recipients (defaults: neilsahani55@gmail.com / promptstudios55@gmail.com) | — |
 
 **Minimum to run:** `AUTH_SECRET` + `GOOGLE_GENAI_API_KEY`. Everything else is
 opt-in — but the database now requires `SUPABASE_DB_URL` (Supabase's free tier works for dev and prod).

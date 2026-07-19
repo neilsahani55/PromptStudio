@@ -33,6 +33,12 @@ export const ENV_SPECS: EnvSpec[] = [
   { key: 'GOOGLE_CLIENT_ID', requirement: 'production', purpose: 'Google OAuth sign-in (client id)' },
   { key: 'GOOGLE_CLIENT_SECRET', requirement: 'production', purpose: 'Google OAuth sign-in (client secret)' },
   { key: 'ADMIN_EMAILS', requirement: 'optional', purpose: 'Comma-separated emails auto-promoted to admin on Google sign-in' },
+  { key: 'SMTP_USER', requirement: 'optional', purpose: 'SMTP sender for feedback emails (Gmail address)' },
+  { key: 'SMTP_PASS', requirement: 'optional', purpose: 'SMTP password (Gmail App Password, not the account password)' },
+  { key: 'SMTP_HOST', requirement: 'optional', purpose: 'SMTP host (default smtp.gmail.com)' },
+  { key: 'SMTP_PORT', requirement: 'optional', purpose: 'SMTP port (default 465)' },
+  { key: 'FEEDBACK_EMAIL_TO', requirement: 'optional', purpose: 'Feedback recipient (default neilsahani55@gmail.com)' },
+  { key: 'FEEDBACK_EMAIL_CC', requirement: 'optional', purpose: 'Feedback CC (default promptstudios55@gmail.com)' },
   { key: 'ALLOWED_DEV_ORIGINS', requirement: 'optional', purpose: 'LAN origins for the dev server' },
 ];
 
