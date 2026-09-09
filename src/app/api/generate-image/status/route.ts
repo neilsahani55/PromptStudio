@@ -47,6 +47,12 @@ export async function GET(req: NextRequest) {
 
     const text = await res.text();
     if (!res.ok) {
+      // NVCF glitches mid-render ("worker did not acknowledge", gateway 5xx)
+      // and recovers — only 4xx means the job is truly gone. Reporting
+      // pending lets the client keep polling inside its own overall budget.
+      if (res.status >= 500) {
+        return NextResponse.json({ pending: true, note: 'provider busy' });
+      }
       return NextResponse.json(
         { error: 'Image job failed', detail: text.slice(0, 300), upstreamStatus: res.status },
         { status: 502 }
