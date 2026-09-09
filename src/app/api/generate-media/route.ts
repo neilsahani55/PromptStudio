@@ -58,16 +58,24 @@ async function runNvidia(model: MediaModel, prompt: string, ar: string, seed: nu
     ? { prompt }
     : { prompt, width, height, steps: isDistilled ? 4 : 28, seed };
 
+  // Ask NVCF to answer immediately (1s hold): congested workers ignore longer
+  // poll headers and hold the socket 30-50s, which gambled the whole function
+  // against Vercel's wall clock. The job always continues server-side — the
+  // client polls it to completion. 12s hard cap per call = a platform 504 is
+  // impossible even with the fallback retry.
   const call = async (key: string) => {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), Math.max(2_000, deadline - Date.now()));
+    const timer = setTimeout(
+      () => controller.abort(),
+      Math.min(12_000, Math.max(2_000, deadline - Date.now()))
+    );
     return fetch(url, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${key}`,
         'Content-Type': 'application/json',
         Accept: 'application/json',
-        'NVCF-POLL-SECONDS': '8',
+        'NVCF-POLL-SECONDS': '1',
       },
       body: JSON.stringify(payload),
       signal: controller.signal,
@@ -201,7 +209,7 @@ async function runHf(model: MediaModel, prompt: string, ar: string, deadline: nu
 }
 
 export async function POST(req: NextRequest) {
-  const deadline = Date.now() + 48_000;
+  const deadline = Date.now() + 40_000;
   let ledgerId = 0;
   try {
     const token = req.cookies.get('auth-token')?.value;
