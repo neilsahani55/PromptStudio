@@ -83,6 +83,12 @@ function friendlyError(raw: string): { title: string; hint?: string } {
       hint: "Rephrase the prompt: avoid brand names, named people, or 'photorealistic'.",
     };
   }
+  if (/^Server Error \(5/i.test(t)) {
+    return {
+      title: "The server took too long to answer.",
+      hint: "Usually a brief provider hiccup — hit Retry and it should go through.",
+    };
+  }
   if (/Timed out|timed out/i.test(t)) {
     return {
       title: "The model took too long and timed out.",
