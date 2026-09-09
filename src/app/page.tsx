@@ -545,6 +545,35 @@ export default function LandingPage() {
                       </span>
                     </li>
                   ))}
+                  {prov === "NVIDIA" && (
+                    <li className="px-2.5 pt-3">
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
+                        Straight from these models
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="relative rounded-lg overflow-hidden border border-primary/20 aspect-[4/3]">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src="/demo/render-garden.jpg" alt="FLUX.2 Klein render" className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+                          <span className="absolute bottom-1 left-1.5 text-[8px] font-code text-white/90 bg-black/45 px-1.5 py-0.5 rounded">
+                            Klein · 4.2s
+                          </span>
+                        </div>
+                        <div className="relative rounded-lg overflow-hidden border border-primary/20 aspect-[4/3]">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src="/demo/render-aurora.jpg" alt="NVIDIA render" className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+                          <span className="absolute bottom-1 left-1.5 text-[8px] font-code text-white/90 bg-black/45 px-1.5 py-0.5 rounded">
+                            Klein · 3.4s
+                          </span>
+                        </div>
+                      </div>
+                      <div className="mt-3 flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2">
+                        <Zap className="w-3.5 h-3.5 text-primary shrink-0" />
+                        <p className="text-[11px] text-muted-foreground leading-snug">
+                          <span className="text-foreground font-semibold">Fastest in the fleet</span> — typical render 3–5s, no daily cap
+                        </p>
+                      </div>
+                    </li>
+                  )}
                 </ul>
                 <p className="px-5 py-4 border-t border-border/50 bg-muted/20 text-xs text-muted-foreground leading-relaxed">
                   {blurb}
