@@ -118,49 +118,50 @@ function LandingNav() {
 // ─── Hero mockup: the studio window, full-width under the headline ───────────
 
 function HeroMockup() {
-  // Each "render" is a layered CSS painting: base scene gradient + light
-  // accents, so the tiles read as finished images rather than placeholders.
+  // Real assets: two images generated with the app's own NVIDIA pipeline and
+  // an actual Wan 2.2 text-to-video render, looping muted like a live result.
   const cells = [
     {
-      label: "FLUX.2 Klein", provider: "NVIDIA", state: "done", meta: "1344×768 · 4.2s",
+      label: "FLUX.2 Klein", provider: "NVIDIA", state: "done", meta: "1024×768 · 4.2s",
       art: (
-        <>
-          <div className="absolute inset-0 bg-gradient-to-b from-amber-200 via-orange-400 to-rose-900" />
-          <div className="absolute inset-0 [background:radial-gradient(circle_at_70%_28%,rgba(255,244,214,0.9),transparent_35%)]" />
-          <div className="absolute bottom-0 inset-x-0 h-2/5 bg-gradient-to-t from-emerald-950/90 via-emerald-800/50 to-transparent" />
-          <div className="absolute bottom-[12%] left-[10%] w-[14%] h-[38%] rounded-t-full bg-emerald-950/80" />
-          <div className="absolute bottom-[10%] right-[14%] w-[10%] h-[28%] rounded-t-full bg-emerald-950/70" />
-        </>
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img src="/demo/render-garden.jpg" alt="AI render — rooftop garden at golden hour" className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
       ),
     },
     {
       label: "Leonardo Phoenix", provider: "Cloudflare", state: "done", meta: "1024×768 · 6.8s",
       art: (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img src="/demo/render-aurora.jpg" alt="AI render — northern lights over mountains" className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+      ),
+    },
+    {
+      label: "Qwen-Image", provider: "Hugging Face", state: "gen", meta: "68% · ~6s left",
+      art: (
         <>
-          <div className="absolute inset-0 bg-gradient-to-br from-fuchsia-500 via-purple-700 to-indigo-950" />
-          <div className="absolute inset-0 [background:radial-gradient(circle_at_30%_30%,rgba(255,190,255,0.55),transparent_40%)]" />
-          <div className="absolute bottom-0 inset-x-0 h-1/3 bg-gradient-to-t from-indigo-950/90 to-transparent" />
-          <div className="absolute top-[18%] right-[20%] w-8 h-8 rounded-full bg-amber-200/90 blur-[1px]" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/demo/render-garden.jpg" alt="" className="absolute inset-0 w-full h-full object-cover blur-lg scale-110 opacity-40" loading="lazy" />
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/15 to-transparent animate-pulse" />
+          <div className="absolute inset-x-6 bottom-1/2 translate-y-1/2">
+            <div className="h-1 rounded-full bg-black/40 overflow-hidden">
+              <div className="h-full w-[68%] rounded-full bg-primary" />
+            </div>
+          </div>
         </>
       ),
     },
     {
-      label: "Qwen-Image", provider: "Hugging Face", state: "gen", meta: "generating…",
+      label: "Wan 2.2 · video", provider: "Hugging Face", state: "video", meta: "0:05 · 16 fps",
       art: (
-        <>
-          <div className="absolute inset-0 bg-gradient-to-br from-muted via-card to-muted" />
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/10 to-transparent animate-pulse" />
-        </>
-      ),
-    },
-    {
-      label: "Wan 2.2 · video", provider: "Hugging Face", state: "video", meta: "0:05 · 24 fps",
-      art: (
-        <>
-          <div className="absolute inset-0 bg-gradient-to-br from-sky-400 via-teal-600 to-emerald-900" />
-          <div className="absolute inset-0 [background:radial-gradient(circle_at_50%_20%,rgba(220,255,250,0.5),transparent_45%)]" />
-          <div className="absolute bottom-0 inset-x-0 h-1/4 bg-gradient-to-t from-emerald-950/80 to-transparent" />
-        </>
+        <video
+          src="/demo/render-video.mp4"
+          className="absolute inset-0 w-full h-full object-cover"
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="metadata"
+        />
       ),
     },
   ];
@@ -181,7 +182,7 @@ function HeroMockup() {
 
         <div className="p-5 md:p-6 grid md:grid-cols-[1fr,1.4fr] gap-5">
           {/* Left: prompt + steps */}
-          <div className="space-y-3">
+          <div className="flex flex-col gap-3">
             <div className="rounded-xl border border-border/60 bg-background/60 p-3.5">
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
                 <Wand2 className="h-3 w-3" /> Step 1 · Prompt
@@ -206,6 +207,25 @@ function HeroMockup() {
             <div className="rounded-xl bg-gradient-to-r from-primary to-primary/80 text-primary-foreground text-center text-xs font-semibold py-2.5 flex items-center justify-center gap-1.5">
               <Sparkles className="h-3.5 w-3.5" /> Step 3 · Generate 4 at once
             </div>
+            <div className="mt-auto rounded-xl border border-primary/20 bg-primary/5 p-3.5 space-y-2">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                <Check className="h-3 w-3 text-primary" /> Live status
+              </p>
+              {[
+                ["FLUX.2 Klein", "done · 4.2s"],
+                ["Leonardo Phoenix", "done · 6.8s"],
+                ["Qwen-Image", "rendering · 68%"],
+                ["Wan 2.2 video", "done · 0:05"],
+              ].map(([name, st]) => (
+                <div key={name} className="flex items-center justify-between text-[11px]">
+                  <span className="font-medium">{name}</span>
+                  <span className={st.startsWith("done") ? "text-primary" : "text-muted-foreground animate-pulse"}>{st}</span>
+                </div>
+              ))}
+              <p className="text-[10px] text-muted-foreground pt-1 border-t border-border/50">
+                All results save to your gallery automatically
+              </p>
+            </div>
           </div>
 
           {/* Right: results grid */}
@@ -218,19 +238,7 @@ function HeroMockup() {
                 </div>
                 <div className="relative aspect-[4/3] overflow-hidden">
                   {c.art}
-                  {c.state === "gen" && (
-                    <span className="absolute inset-0 flex items-center justify-center text-[10px] text-muted-foreground">
-                      generating…
-                    </span>
-                  )}
-                  {c.state === "video" && (
-                    <span className="absolute inset-0 flex items-center justify-center">
-                      <span className="w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center border border-white/30">
-                        <span className="ml-0.5 border-y-[6px] border-y-transparent border-l-[10px] border-l-white" />
-                      </span>
-                    </span>
-                  )}
-                  <span className="absolute bottom-1.5 right-2 text-[8px] font-code text-white/80 bg-black/35 px-1.5 py-0.5 rounded">
+                  <span className="absolute bottom-1.5 right-2 text-[8px] font-code text-white/85 bg-black/40 px-1.5 py-0.5 rounded">
                     {c.meta}
                   </span>
                 </div>
@@ -491,19 +499,34 @@ export default function LandingPage() {
         </div>
 
         <div className="grid md:grid-cols-3 gap-5">
-          {(["NVIDIA", "Cloudflare", "Hugging Face"] as const).map((prov) => {
+          {(
+            [
+              {
+                prov: "NVIDIA" as const,
+                blurb: "Hosted free on build.nvidia.com — the fastest renders in the fleet, including the brand-new Cosmos 3 Super.",
+              },
+              {
+                prov: "Cloudflare" as const,
+                blurb: "Workers AI free tier — 10,000 neurons refresh every day, powering the biggest slice of the fleet.",
+              },
+              {
+                prov: "Hugging Face" as const,
+                blurb: "The HF router unlocks Qwen-Image and every video model. Bring your own free token for your own quota.",
+              },
+            ]
+          ).map(({ prov, blurb }) => {
             const imgs = IMAGE_MODELS.filter((m) => m.provider === prov);
             const vids = VIDEO_MODELS.filter((m) => m.provider === prov);
             return (
-              <div key={prov} className="rounded-3xl border panel-warm bg-card overflow-hidden">
-                <div className="px-5 py-4 border-b border-border/60 bg-muted/40 flex items-center gap-2.5">
+              <div key={prov} className="flex flex-col rounded-3xl border panel-warm bg-card overflow-hidden">
+                <div className="relative px-5 py-4 border-b border-primary/15 bg-gradient-to-r from-primary/10 to-transparent flex items-center gap-2.5">
                   <span className={`w-2.5 h-2.5 rounded-full ${PROVIDER_DOT[prov]}`} />
                   <span className="font-headline font-bold">{prov}</span>
-                  <span className="ml-auto text-[11px] text-muted-foreground">
+                  <span className="ml-auto text-[11px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
                     {imgs.length + vids.length} models
                   </span>
                 </div>
-                <ul className="p-3">
+                <ul className="p-3 flex-1">
                   {imgs.map((m, i) => (
                     <li key={`${m.name}-${i}`} className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-muted/50 transition-colors">
                       <ImageIcon className="w-3.5 h-3.5 text-primary shrink-0" />
@@ -523,6 +546,9 @@ export default function LandingPage() {
                     </li>
                   ))}
                 </ul>
+                <p className="px-5 py-4 border-t border-border/50 bg-muted/20 text-xs text-muted-foreground leading-relaxed">
+                  {blurb}
+                </p>
               </div>
             );
           })}
@@ -536,29 +562,42 @@ export default function LandingPage() {
 
       {/* ─── Final CTA ───────────────────────────────────────── */}
       <section className="container mx-auto max-w-7xl px-4 md:px-6 pb-20 md:pb-28">
-        <div className="relative overflow-hidden rounded-[2.5rem] border border-primary/25 bg-gradient-to-br from-primary/15 via-card to-accent/15 p-10 md:p-16 text-center">
-          <div className="absolute inset-0 bg-dot-grid opacity-40 pointer-events-none" />
-          <div className="pointer-events-none absolute -top-20 left-1/2 -translate-x-1/2 w-96 h-96 bg-primary/25 blur-3xl rounded-full" />
-          <div className="relative">
-            <Logo size={64} className="mx-auto rounded-2xl shadow-xl shadow-primary/25 mb-7" />
-            <h2 className="font-headline text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight max-w-2xl mx-auto">
-              Let the models compete for your best shot
-            </h2>
-            <p className="mt-5 text-muted-foreground text-lg max-w-xl mx-auto">
-              Sign in with Google, get 10 free credits every day, and start creating in seconds.
-            </p>
-            <div className="mt-9 flex flex-col sm:flex-row gap-3 justify-center">
-              <Button asChild size="lg" className="h-12 px-8 text-base rounded-full bg-gradient-to-r from-primary to-primary/80 text-primary-foreground hover:opacity-90 shadow-lg shadow-primary/25">
-                <Link href={primaryCta.href}>
-                  {primaryCta.label}
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-              {!user && (
-                <Button asChild size="lg" variant="outline" className="h-12 px-8 text-base rounded-full">
-                  <Link href="/login">I already have an account</Link>
+        {/* Gradient ring wrapper */}
+        <div className="rounded-[2.5rem] bg-gradient-to-br from-primary/60 via-primary/15 to-primary/40 p-px shadow-2xl shadow-primary/15">
+          <div className="relative overflow-hidden rounded-[calc(2.5rem-1px)] bg-gradient-to-b from-card via-background to-card p-10 md:p-16 text-center">
+            <div className="absolute inset-0 bg-dot-grid opacity-30 pointer-events-none" />
+            <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 w-[480px] h-72 bg-primary/20 blur-3xl rounded-full" />
+            <div className="relative">
+              <Logo size={64} className="mx-auto rounded-2xl shadow-xl shadow-primary/25 mb-7" />
+              <h2 className="font-headline text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight max-w-2xl mx-auto">
+                Let the models{" "}
+                <span className="text-gradient from-primary via-orange-400 to-primary animate-gradient">compete</span>
+                {" "}for your best shot
+              </h2>
+              <p className="mt-5 text-muted-foreground text-lg max-w-xl mx-auto">
+                Sign in with Google and start creating in seconds — no card, no setup.
+              </p>
+              <div className="mt-7 flex flex-wrap justify-center gap-2.5">
+                {["10 free credits daily", "17 AI models", "Images + video", "Bring your own keys"].map((chip) => (
+                  <span key={chip} className="inline-flex items-center gap-1.5 text-xs font-medium px-3.5 py-1.5 rounded-full border border-primary/25 bg-primary/10 text-foreground/90">
+                    <Check className="w-3 h-3 text-primary" />
+                    {chip}
+                  </span>
+                ))}
+              </div>
+              <div className="mt-9 flex flex-col sm:flex-row gap-3 justify-center">
+                <Button asChild size="lg" className="h-12 px-8 text-base rounded-full bg-gradient-to-r from-primary to-primary/80 text-primary-foreground hover:opacity-90 shadow-lg shadow-primary/25">
+                  <Link href={primaryCta.href}>
+                    {primaryCta.label}
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
                 </Button>
-              )}
+                {!user && (
+                  <Button asChild size="lg" variant="outline" className="h-12 px-8 text-base rounded-full">
+                    <Link href="/login">I already have an account</Link>
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </div>
