@@ -111,6 +111,7 @@ export function MediaStudio({
 
   const [models, setModels] = useState<{ image: StudioModel[]; video: StudioModel[] }>({ image: [], video: [] });
   const [missingProviders, setMissingProviders] = useState<string[]>([]);
+  const [hfDepleted, setHfDepleted] = useState(false);
   const [credits, setCredits] = useState<CreditsInfo | null>(null);
   const [mode, setMode] = useState<"image" | "video">("image");
   const [selected, setSelected] = useState<Record<"image" | "video", string[]>>({ image: [], video: [] });
@@ -126,6 +127,7 @@ export function MediaStudio({
         if (!data) return;
         setModels({ image: data.image || [], video: data.video || [] });
         setMissingProviders(data.missingProviders || []);
+        setHfDepleted(!!data.hfDepleted);
         if (data.credits) setCredits(data.credits);
         if (initial) {
           // Sensible defaults: first two image models pre-selected.
@@ -321,7 +323,9 @@ export function MediaStudio({
         {activeModels.length === 0 ? (
           <p className="text-xs text-muted-foreground border border-dashed border-border rounded-lg p-3">
             {mode === "video"
-              ? "No video models configured. Add HF_TOKEN (free at huggingface.co) to unlock LTX-Video and Wan 2.2 — see ENVIRONMENT.md."
+              ? hfDepleted
+                ? "Video is paused — the app's free Hugging Face credits are used up this month. Add your own HF token in Settings → API Keys (free at huggingface.co/settings/tokens) to generate video on your own quota."
+                : "No video models configured. Add HF_TOKEN (free at huggingface.co) to unlock LTX-Video and Wan 2.2 — see ENVIRONMENT.md."
               : "No image models configured. Add NVIDIA_API_KEY — see ENVIRONMENT.md."}
           </p>
         ) : (
@@ -345,6 +349,12 @@ export function MediaStudio({
               );
             })}
           </div>
+        )}
+        {hfDepleted && activeModels.length > 0 && (
+          <p className="text-[11px] text-muted-foreground">
+            ⏸ Hugging Face models are hidden — the app's free monthly credits are used up. Add your
+            own HF token in Settings → API Keys to bring them back on your own quota.
+          </p>
         )}
         {missingProviders.length > 0 && (
           <p className="text-[11px] text-muted-foreground">
