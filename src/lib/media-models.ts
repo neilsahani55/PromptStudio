@@ -45,7 +45,58 @@ export const MEDIA_MODELS: MediaModel[] = [
     maxPrompt: 1500,
     note: 'High quality · NVIDIA',
   },
+  // NVCF pexec function (not a genai path) — endpoint is 'nvcf:<function-id>'.
+  // Accepts ONLY {prompt} (width/height cause a 503). Self-scoring multi-pass
+  // model; renders take ~3-4 minutes via the async polling flow.
+  {
+    id: 'nvidia-cosmos3',
+    label: 'Cosmos 3 Super',
+    kind: 'image',
+    provider: 'nvidia',
+    endpoint: 'nvcf:f65a2585-3b67-46ce-a431-af764d93e954',
+    maxPrompt: 1500,
+    note: 'Newest NVIDIA · slow (~3-4 min)',
+  },
   // ─── Images: Cloudflare Workers AI (free daily allocation) ────
+  // flux-2-* endpoints require multipart/form-data input (verified Sept 2026);
+  // runCloudflare switches encoding on the endpoint name. flux-2-dev exists
+  // too but renders >120s — over the 60s function cap, so it's not listed.
+  {
+    id: 'cf-flux2-klein-4b',
+    label: 'FLUX.2 Klein 4B (CF)',
+    kind: 'image',
+    provider: 'cloudflare',
+    endpoint: '@cf/black-forest-labs/flux-2-klein-4b',
+    maxPrompt: 2000,
+    note: 'New FLUX.2 · Cloudflare',
+  },
+  {
+    id: 'cf-flux2-klein-9b',
+    label: 'FLUX.2 Klein 9B (CF)',
+    kind: 'image',
+    provider: 'cloudflare',
+    endpoint: '@cf/black-forest-labs/flux-2-klein-9b',
+    maxPrompt: 2000,
+    note: 'New FLUX.2, higher quality · Cloudflare',
+  },
+  {
+    id: 'cf-leonardo-phoenix',
+    label: 'Leonardo Phoenix',
+    kind: 'image',
+    provider: 'cloudflare',
+    endpoint: '@cf/leonardo/phoenix-1.0',
+    maxPrompt: 2000,
+    note: 'Vivid styles · Cloudflare',
+  },
+  {
+    id: 'cf-lucid-origin',
+    label: 'Leonardo Lucid Origin',
+    kind: 'image',
+    provider: 'cloudflare',
+    endpoint: '@cf/leonardo/lucid-origin',
+    maxPrompt: 2000,
+    note: 'Sharp & versatile · Cloudflare',
+  },
   {
     id: 'cf-flux-schnell',
     label: 'FLUX.1 Schnell',
@@ -82,15 +133,16 @@ export const MEDIA_MODELS: MediaModel[] = [
     maxPrompt: 2000,
     note: 'Artistic · Cloudflare',
   },
-  // ─── Images: Hugging Face router → Together (verified live) ──
-  // Image endpoints are Together model ids, called through HF's router at
-  // /together/v1/images/generations (verified July 2026).
+  // ─── Images: Hugging Face router → fal (verified Sept 2026) ──
+  // Together's image routes died (models delisted / third-party data sharing
+  // blocked); fal is the live provider for all three. Endpoints are fal ids,
+  // called synchronously at /fal-ai/{id}.
   {
     id: 'hf-flux-schnell',
     label: 'FLUX.1 Schnell (HF)',
     kind: 'image',
     provider: 'hf',
-    endpoint: 'black-forest-labs/FLUX.1-schnell',
+    endpoint: 'fal-ai/flux/schnell',
     maxPrompt: 2000,
     note: 'Fast · Hugging Face',
   },
@@ -99,7 +151,7 @@ export const MEDIA_MODELS: MediaModel[] = [
     label: 'SDXL',
     kind: 'image',
     provider: 'hf',
-    endpoint: 'stabilityai/stable-diffusion-xl-base-1.0',
+    endpoint: 'fal-ai/fast-sdxl',
     maxPrompt: 2000,
     note: 'Classic SDXL · Hugging Face',
   },
@@ -108,16 +160,36 @@ export const MEDIA_MODELS: MediaModel[] = [
     label: 'Qwen-Image',
     kind: 'image',
     provider: 'hf',
-    endpoint: 'Qwen/Qwen-Image',
+    endpoint: 'fal-ai/qwen-image',
     maxPrompt: 2000,
     note: 'Best text-in-image · Hugging Face',
   },
-  // ─── Video: Hugging Face router → fal queue (verified routes) ─
+  // ─── Video: Hugging Face router → fal queue (verified Sept 2026) ─
   // Video endpoints are fal provider ids, called through HF's router at
-  // /fal-ai/{id}?_subdomain=queue with async polling. Uses HF credits.
+  // /fal-ai/{id}?_subdomain=queue with async polling. Uses HF credits —
+  // cheaper models first so free credits stretch further. NVIDIA and
+  // Cloudflare host no text-to-video API (Cosmos is self-host-only NIM).
+  {
+    id: 'hf-ltx',
+    label: 'LTX-Video',
+    kind: 'video',
+    provider: 'hf',
+    endpoint: 'fal-ai/ltx-video-13b-distilled',
+    maxPrompt: 1200,
+    note: 'Fastest & cheapest video · Hugging Face',
+  },
+  {
+    id: 'hf-wan-5b',
+    label: 'Wan 2.2 (5B)',
+    kind: 'video',
+    provider: 'hf',
+    endpoint: 'fal-ai/wan/v2.2-5b/text-to-video',
+    maxPrompt: 1200,
+    note: 'Fast video · Hugging Face',
+  },
   {
     id: 'hf-wan',
-    label: 'Wan 2.2',
+    label: 'Wan 2.2 (14B)',
     kind: 'video',
     provider: 'hf',
     endpoint: 'fal-ai/wan/v2.2-a14b/text-to-video',

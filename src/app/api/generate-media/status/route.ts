@@ -7,7 +7,12 @@ export const maxDuration = 60;
 
 // Only fal endpoints from our registry may be polled (prevents SSRF via the
 // endpoint param).
-const ALLOWED_ENDPOINTS = new Set(['fal-ai/wan/v2.2-a14b/text-to-video', 'fal-ai/hunyuan-video']);
+const ALLOWED_ENDPOINTS = new Set([
+  'fal-ai/ltx-video-13b-distilled',
+  'fal-ai/wan/v2.2-5b/text-to-video',
+  'fal-ai/wan/v2.2-a14b/text-to-video',
+  'fal-ai/hunyuan-video',
+]);
 
 // Polls a fal queue job through the HF router. The client calls this every
 // few seconds — each poll is its own short request, so multi-minute video

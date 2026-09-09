@@ -44,7 +44,17 @@ async function runNvidia(model: MediaModel, prompt: string, ar: string, seed: nu
   const isDistilled = /klein|schnell|turbo/i.test(model.endpoint);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), Math.max(2_000, deadline - Date.now()));
-  const res = await fetch(`https://ai.api.nvidia.com/v1/genai/${model.endpoint}`, {
+  // 'nvcf:<id>' endpoints invoke a raw NVCF function; they accept only
+  // {prompt} (extra fields like width/height error). Both paths share the
+  // same async 202+reqId flow and status endpoint.
+  const nvcfId = model.endpoint.startsWith('nvcf:') ? model.endpoint.slice(5) : null;
+  const url = nvcfId
+    ? `https://api.nvcf.nvidia.com/v2/nvcf/pexec/functions/${nvcfId}`
+    : `https://ai.api.nvidia.com/v1/genai/${model.endpoint}`;
+  const payload = nvcfId
+    ? { prompt }
+    : { prompt, width, height, steps: isDistilled ? 4 : 28, seed };
+  const res = await fetch(url, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -52,7 +62,7 @@ async function runNvidia(model: MediaModel, prompt: string, ar: string, seed: nu
       Accept: 'application/json',
       'NVCF-POLL-SECONDS': '45',
     },
-    body: JSON.stringify({ prompt, width, height, steps: isDistilled ? 4 : 28, seed }),
+    body: JSON.stringify(payload),
     signal: controller.signal,
   }).finally(() => clearTimeout(timer));
 
@@ -68,6 +78,7 @@ async function runNvidia(model: MediaModel, prompt: string, ar: string, seed: nu
   try { data = JSON.parse(text); } catch { return errJson(502, 'Invalid response from NVIDIA'); }
   let b64: string | null = data.artifacts?.[0]?.base64 ?? data.data?.[0]?.b64_json ?? null;
   if (!b64 && typeof data.image === 'string') b64 = data.image;
+  if (!b64 && typeof data.image_b64 === 'string') b64 = data.image_b64;
   if (!b64) return errJson(502, 'No image returned from model');
   if (!b64.startsWith('data:')) b64 = `data:image/jpeg;base64,${b64}`;
   return okJson({ modelId: model.id, kind: 'image', media: { base64: b64, url: null } });
@@ -78,26 +89,33 @@ async function runCloudflare(model: MediaModel, prompt: string, deadline: number
   const acct = process.env.CLOUDFLARE_ACCOUNT_ID;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), Math.max(2_000, deadline - Date.now()));
+  // flux-2-* models only accept multipart/form-data; the rest take JSON.
+  let body: BodyInit;
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}`,
+  };
+  if (model.endpoint.includes('flux-2-')) {
+    const form = new FormData();
+    form.append('prompt', prompt);
+    body = form;
+  } else {
+    headers['Content-Type'] = 'application/json';
+    body = JSON.stringify({ prompt });
+  }
   const res = await fetch(
     `https://api.cloudflare.com/client/v4/accounts/${acct}/ai/run/${model.endpoint}`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ prompt }),
-      signal: controller.signal,
-    }
+    { method: 'POST', headers, body, signal: controller.signal }
   ).finally(() => clearTimeout(timer));
 
   const contentType = res.headers.get('content-type') || '';
   if (!res.ok) {
     const text = await res.text();
-    return errJson(502, `${model.label} failed`, text.slice(0, 250),
-      res.status === 401 || res.status === 403
+    const hint = text.includes('daily free allocation')
+      ? "Cloudflare's free daily allocation (10,000 neurons) is used up — it resets at midnight UTC. Try an NVIDIA or Hugging Face model meanwhile."
+      : res.status === 401 || res.status === 403
         ? 'Check CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN (token needs the Workers AI permission).'
-        : undefined);
+        : undefined;
+    return errJson(502, `${model.label} failed`, text.slice(0, 250), hint);
   }
   if (contentType.includes('application/json')) {
     const data: any = await res.json();
@@ -112,11 +130,12 @@ async function runCloudflare(model: MediaModel, prompt: string, deadline: number
 }
 
 // ─── Hugging Face router ────────────────────────────────────────────────────
-// Images: Together's OpenAI-compatible route (verified live July 2026).
+// Images: fal's sync route (verified Sept 2026 — Together's image routes are
+// dead: models delisted / third-party data sharing blocked).
 // Video: fal's async queue — POST returns a request_id which the client polls
 // via /api/generate-media/status (each poll is its own request, so long video
 // renders aren't bound by the 60s function limit).
-async function runHf(model: MediaModel, prompt: string, deadline: number, hfToken: string) {
+async function runHf(model: MediaModel, prompt: string, ar: string, deadline: number, hfToken: string) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), Math.max(2_000, deadline - Date.now()));
   const headers = {
@@ -125,10 +144,11 @@ async function runHf(model: MediaModel, prompt: string, deadline: number, hfToke
   };
   try {
     if (model.kind === 'image') {
-      const res = await fetch('https://router.huggingface.co/together/v1/images/generations', {
+      const { width, height } = dims(ar);
+      const res = await fetch(`https://router.huggingface.co/fal-ai/${model.endpoint}`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ model: model.endpoint, prompt, response_format: 'b64_json' }),
+        body: JSON.stringify({ prompt, image_size: { width, height } }),
         signal: controller.signal,
       });
       const text = await res.text();
@@ -136,12 +156,11 @@ async function runHf(model: MediaModel, prompt: string, deadline: number, hfToke
         return errJson(502, `${model.label} failed`, text.slice(0, 250),
           res.status === 402 ? HF_CREDITS_HINT : undefined);
       }
-      const data: any = JSON.parse(text);
-      const item = data?.data?.[0];
-      const b64 = item?.b64_json ? `data:image/png;base64,${item.b64_json}` : null;
-      const url = item?.url ?? null;
-      if (!b64 && !url) return errJson(502, 'No image returned from model');
-      return okJson({ modelId: model.id, kind: 'image', media: { base64: b64, url } });
+      let data: any;
+      try { data = JSON.parse(text); } catch { return errJson(502, 'Invalid response from image provider'); }
+      const url: string | null = data?.images?.[0]?.url ?? null;
+      if (!url) return errJson(502, 'No image returned from model', text.slice(0, 200));
+      return okJson({ modelId: model.id, kind: 'image', media: { base64: null, url } });
     }
 
     // Video via fal queue
@@ -227,7 +246,7 @@ export async function POST(req: NextRequest) {
         res = await runCloudflare(model, prompt, deadline);
         break;
       case 'hf':
-        res = await runHf(model, prompt, deadline, hfToken);
+        res = await runHf(model, prompt, aspectRatio, deadline, hfToken);
         break;
     }
     // Provider failed — the user shouldn't lose a credit for it.

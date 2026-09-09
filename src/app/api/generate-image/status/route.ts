@@ -60,6 +60,7 @@ export async function GET(req: NextRequest) {
     else if (data.data?.length > 0) { imageUrl = data.data[0].url; base64 = data.data[0].b64_json; }
     else if (typeof data.image === 'string') base64 = data.image;
     else if (data.image?.base64) base64 = data.image.base64;
+    else if (typeof data.image_b64 === 'string') base64 = data.image_b64;
 
     if (!base64 && !imageUrl) {
       return NextResponse.json({ error: 'No image returned from model' }, { status: 502 });

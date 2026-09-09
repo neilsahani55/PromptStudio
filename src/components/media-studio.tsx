@@ -40,7 +40,7 @@ interface CreditsInfo {
 // Poll the NVCF status endpoint for NVIDIA async jobs (each poll is its own
 // short request — total time is not bound by any single 60s function).
 async function pollStatus(reqId: string): Promise<{ base64: string | null; url: string | null }> {
-  const deadline = Date.now() + 240_000;
+  const deadline = Date.now() + 360_000;
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 2500));
     let res: Response;
@@ -55,7 +55,7 @@ async function pollStatus(reqId: string): Promise<{ base64: string | null; url: 
     }
     if (data?.image) return data.image;
   }
-  throw new Error("Timed out after 4 minutes.");
+  throw new Error("Timed out after 6 minutes.");
 }
 
 // Poll a fal video job (via /api/generate-media/status). Video renders can
