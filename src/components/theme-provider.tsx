@@ -22,8 +22,8 @@ export type Theme =
   | "emerald";
 
 export const THEMES: { id: Theme; label: string; swatch: string }[] = [
-  { id: "light", label: "Light", swatch: "#ffffff" },
-  { id: "dark", label: "Dark", swatch: "#1f1f1f" },
+  { id: "light", label: "Aurora Light", swatch: "#7c4dff" },
+  { id: "dark", label: "Aurora Dark", swatch: "#14121f" },
   { id: "ocean-blue", label: "Ocean Blue", swatch: "#2563eb" },
   { id: "forest-green", label: "Forest Green", swatch: "#16a34a" },
   { id: "sunset", label: "Sunset", swatch: "#f97316" },

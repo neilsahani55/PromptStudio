@@ -10,9 +10,9 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        body: ['Oxanium', 'sans-serif'],
-        headline: ['Merriweather', 'serif'],
-        code: ['Fira Code', 'monospace'],
+        body: ['Inter', 'system-ui', 'sans-serif'],
+        headline: ['"Space Grotesk"', 'system-ui', 'sans-serif'],
+        code: ['"JetBrains Mono"', 'monospace'],
       },
       colors: {
         background: 'hsl(var(--background))',

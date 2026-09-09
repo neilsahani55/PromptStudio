@@ -3,58 +3,60 @@
 @tailwind utilities;
 
 @layer base {
+  /* ─── Aurora light: cool paper white, electric violet + cyan ─ */
   :root {
-    --background: 40 75% 98%;
-    --foreground: 21 18% 25%;
-    --card: 36 47% 95%;
-    --card-foreground: 21 18% 25%;
-    --popover: 36 47% 95%;
-    --popover-foreground: 21 18% 25%;
-    --primary: 33 90% 37%;
+    --background: 240 25% 99%;
+    --foreground: 244 30% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 244 30% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 244 30% 12%;
+    --primary: 258 85% 58%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 34 64% 73%;
-    --secondary-foreground: 33 5% 32%;
-    --muted: 39 46% 90%;
-    --muted-foreground: 25 5% 45%;
-    --accent: 33 75% 84%;
-    --accent-foreground: 33 5% 32%;
-    --destructive: 0 70% 35%;
+    --secondary: 250 35% 93%;
+    --secondary-foreground: 250 25% 25%;
+    --muted: 246 30% 95%;
+    --muted-foreground: 248 12% 45%;
+    --accent: 190 90% 40%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 48%;
     --destructive-foreground: 0 0% 100%;
-    --border: 40 44% 82%;
-    --input: 40 44% 82%;
-    --ring: 33 90% 37%;
-    --chart-1: 33 90% 37%;
-    --chart-2: 25 5% 45%;
-    --chart-3: 38 92% 33%;
-    --chart-4: 25 5% 45%;
-    --chart-5: 42 96% 40%;
-    --radius: 0.3rem;
+    --border: 246 25% 88%;
+    --input: 246 25% 88%;
+    --ring: 258 85% 58%;
+    --chart-1: 258 85% 58%;
+    --chart-2: 190 90% 40%;
+    --chart-3: 288 70% 55%;
+    --chart-4: 220 85% 58%;
+    --chart-5: 330 75% 58%;
+    --radius: 0.75rem;
   }
+  /* ─── Aurora dark (default): deep indigo night ──────────── */
   .dark {
-    --background: 24 10% 10%;
-    --foreground: 60 5% 96%;
-    --card: 12 5% 15%;
-    --card-foreground: 60 5% 96%;
-    --popover: 12 5% 15%;
-    --popover-foreground: 60 5% 96%;
-    --primary: 25 95% 53%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 33 5% 32%;
-    --secondary-foreground: 20 6% 90%;
-    --muted: 12 5% 15%;
-    --muted-foreground: 30 5% 64%;
-    --accent: 199 46% 22%;
-    --accent-foreground: 20 6% 90%;
-    --destructive: 0 72% 51%;
+    --background: 248 30% 7%;
+    --foreground: 246 25% 95%;
+    --card: 248 25% 10%;
+    --card-foreground: 246 25% 95%;
+    --popover: 248 25% 10%;
+    --popover-foreground: 246 25% 95%;
+    --primary: 258 92% 68%;
+    --primary-foreground: 250 40% 8%;
+    --secondary: 248 20% 18%;
+    --secondary-foreground: 246 20% 90%;
+    --muted: 248 22% 13%;
+    --muted-foreground: 247 12% 66%;
+    --accent: 188 95% 55%;
+    --accent-foreground: 250 40% 8%;
+    --destructive: 0 72% 56%;
     --destructive-foreground: 0 0% 100%;
-    --border: 30 7% 25%;
-    --input: 30 7% 25%;
-    --ring: 25 95% 53%;
-    --chart-1: 25 95% 53%;
-    --chart-2: 199 89% 48%;
-    --chart-3: 48 96% 47%;
-    --chart-4: 30 5% 64%;
-    --chart-5: 25 5% 45%;
+    --border: 248 18% 20%;
+    --input: 248 18% 20%;
+    --ring: 258 92% 68%;
+    --chart-1: 258 92% 68%;
+    --chart-2: 188 95% 55%;
+    --chart-3: 288 80% 68%;
+    --chart-4: 220 90% 66%;
+    --chart-5: 330 80% 65%;
   }
 
   /* ─── Ocean Blue (light-feel) ───────────────────────────── */
@@ -291,6 +293,18 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+  /* Ambient aurora glow — a fixed wash of violet + cyan behind everything
+     in dark themes; subtle enough to keep text contrast intact. */
+  .dark body {
+    background-image:
+      radial-gradient(ellipse 60% 40% at 15% -5%, hsl(258 92% 68% / 0.10), transparent 60%),
+      radial-gradient(ellipse 50% 35% at 85% -5%, hsl(188 95% 55% / 0.07), transparent 60%);
+    background-attachment: fixed;
+  }
+  h1, h2, h3 {
+    @apply font-headline;
+    letter-spacing: -0.02em;
   }
 }
 
