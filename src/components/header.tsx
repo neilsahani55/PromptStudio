@@ -25,7 +25,7 @@ export function Header() {
 
   return (
     <div className="sticky top-4 z-50 px-4 pb-2">
-      <header className="container mx-auto max-w-5xl rounded-2xl border border-border/60 glass shadow-lg shadow-black/5 py-2 px-3 md:px-4 flex items-center justify-between">
+      <header className="container mx-auto max-w-6xl rounded-2xl border border-border/60 glass shadow-lg shadow-black/5 py-2 px-3 md:px-4 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2.5 group" title="Go to home page">
           <Logo size={36} className="rounded-xl shadow-md shadow-primary/20 group-hover:scale-105 transition-transform" />
           <div>

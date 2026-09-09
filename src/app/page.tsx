@@ -68,7 +68,7 @@ function LandingNav() {
 
   return (
     <div className="sticky top-4 z-50 px-4">
-      <header className="mx-auto max-w-5xl rounded-2xl border border-border/60 glass shadow-lg shadow-black/5">
+      <header className="mx-auto max-w-6xl rounded-2xl border border-border/60 glass shadow-lg shadow-black/5">
         <div className="flex items-center justify-between px-4 md:px-5 py-2.5">
           <Link href="/" className="flex items-center gap-2.5">
             <Logo size={34} className="rounded-xl shadow-md shadow-primary/20" />
@@ -118,16 +118,56 @@ function LandingNav() {
 // ─── Hero mockup: the studio window, full-width under the headline ───────────
 
 function HeroMockup() {
+  // Each "render" is a layered CSS painting: base scene gradient + light
+  // accents, so the tiles read as finished images rather than placeholders.
   const cells = [
-    { label: "FLUX.2 Klein", provider: "NVIDIA", state: "done" },
-    { label: "Leonardo Phoenix", provider: "Cloudflare", state: "done" },
-    { label: "Qwen-Image", provider: "Hugging Face", state: "gen" },
-    { label: "Wan 2.2 · video", provider: "Hugging Face", state: "video" },
+    {
+      label: "FLUX.2 Klein", provider: "NVIDIA", state: "done", meta: "1344×768 · 4.2s",
+      art: (
+        <>
+          <div className="absolute inset-0 bg-gradient-to-b from-amber-200 via-orange-400 to-rose-900" />
+          <div className="absolute inset-0 [background:radial-gradient(circle_at_70%_28%,rgba(255,244,214,0.9),transparent_35%)]" />
+          <div className="absolute bottom-0 inset-x-0 h-2/5 bg-gradient-to-t from-emerald-950/90 via-emerald-800/50 to-transparent" />
+          <div className="absolute bottom-[12%] left-[10%] w-[14%] h-[38%] rounded-t-full bg-emerald-950/80" />
+          <div className="absolute bottom-[10%] right-[14%] w-[10%] h-[28%] rounded-t-full bg-emerald-950/70" />
+        </>
+      ),
+    },
+    {
+      label: "Leonardo Phoenix", provider: "Cloudflare", state: "done", meta: "1024×768 · 6.8s",
+      art: (
+        <>
+          <div className="absolute inset-0 bg-gradient-to-br from-fuchsia-500 via-purple-700 to-indigo-950" />
+          <div className="absolute inset-0 [background:radial-gradient(circle_at_30%_30%,rgba(255,190,255,0.55),transparent_40%)]" />
+          <div className="absolute bottom-0 inset-x-0 h-1/3 bg-gradient-to-t from-indigo-950/90 to-transparent" />
+          <div className="absolute top-[18%] right-[20%] w-8 h-8 rounded-full bg-amber-200/90 blur-[1px]" />
+        </>
+      ),
+    },
+    {
+      label: "Qwen-Image", provider: "Hugging Face", state: "gen", meta: "generating…",
+      art: (
+        <>
+          <div className="absolute inset-0 bg-gradient-to-br from-muted via-card to-muted" />
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/10 to-transparent animate-pulse" />
+        </>
+      ),
+    },
+    {
+      label: "Wan 2.2 · video", provider: "Hugging Face", state: "video", meta: "0:05 · 24 fps",
+      art: (
+        <>
+          <div className="absolute inset-0 bg-gradient-to-br from-sky-400 via-teal-600 to-emerald-900" />
+          <div className="absolute inset-0 [background:radial-gradient(circle_at_50%_20%,rgba(220,255,250,0.5),transparent_45%)]" />
+          <div className="absolute bottom-0 inset-x-0 h-1/4 bg-gradient-to-t from-emerald-950/80 to-transparent" />
+        </>
+      ),
+    },
   ];
   return (
-    <div className="relative mx-auto w-full max-w-3xl animate-float">
+    <div className="relative mx-auto w-full max-w-4xl animate-float">
       <div className="absolute -inset-8 bg-gradient-to-r from-primary/25 via-primary/10 to-accent/25 blur-3xl rounded-full opacity-70" />
-      <div className="relative rounded-3xl border border-border bg-card/95 shadow-2xl shadow-primary/15 overflow-hidden backdrop-blur">
+      <div className="relative rounded-3xl border panel-warm bg-card/95 shadow-2xl shadow-primary/15 overflow-hidden backdrop-blur">
         {/* Window chrome */}
         <div className="flex items-center gap-1.5 px-5 py-3.5 border-b border-border/60 bg-muted/40">
           <span className="w-3 h-3 rounded-full bg-destructive/60" />
@@ -171,17 +211,28 @@ function HeroMockup() {
           {/* Right: results grid */}
           <div className="grid grid-cols-2 gap-2.5">
             {cells.map((c) => (
-              <div key={c.label} className="rounded-xl border border-border/60 bg-background/40 overflow-hidden">
-                <div className="px-2.5 py-1.5 border-b border-border/50 flex items-center justify-between">
+              <div key={c.label} className="rounded-xl border border-primary/20 bg-background/40 overflow-hidden">
+                <div className="px-2.5 py-1.5 border-b border-border/50 flex items-center justify-between bg-card/60">
                   <span className="text-[10px] font-semibold truncate">{c.label}</span>
                   {c.state === "done" && <Check className="w-3 h-3 text-primary shrink-0" />}
                 </div>
-                <div className="aspect-[4/3] flex items-center justify-center bg-gradient-to-br from-primary/15 via-accent/10 to-secondary/20">
+                <div className="relative aspect-[4/3] overflow-hidden">
+                  {c.art}
                   {c.state === "gen" && (
-                    <span className="text-[10px] text-muted-foreground animate-pulse">generating…</span>
+                    <span className="absolute inset-0 flex items-center justify-center text-[10px] text-muted-foreground">
+                      generating…
+                    </span>
                   )}
-                  {c.state === "video" && <Film className="w-5 h-5 text-primary/70" />}
-                  {c.state === "done" && <ImageIcon className="w-5 h-5 text-primary/70" />}
+                  {c.state === "video" && (
+                    <span className="absolute inset-0 flex items-center justify-center">
+                      <span className="w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center border border-white/30">
+                        <span className="ml-0.5 border-y-[6px] border-y-transparent border-l-[10px] border-l-white" />
+                      </span>
+                    </span>
+                  )}
+                  <span className="absolute bottom-1.5 right-2 text-[8px] font-code text-white/80 bg-black/35 px-1.5 py-0.5 rounded">
+                    {c.meta}
+                  </span>
                 </div>
               </div>
             ))}
@@ -197,7 +248,7 @@ function HeroMockup() {
 function ModelMarquee() {
   const all = [...IMAGE_MODELS, ...VIDEO_MODELS.map((m) => ({ ...m, tag: `${m.tag} video` }))];
   const Chip = ({ m }: { m: (typeof all)[number] }) => (
-    <span className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border border-border bg-card whitespace-nowrap mx-1.5">
+    <span className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full border panel-warm bg-card whitespace-nowrap mx-1.5">
       <span className={`w-2 h-2 rounded-full ${PROVIDER_DOT[m.provider] || "bg-primary"}`} />
       {m.name}
       <span className="text-[10px] text-muted-foreground">{m.tag}</span>
@@ -230,7 +281,7 @@ export default function LandingPage() {
         <div className="absolute inset-0 bg-dot-grid opacity-50 pointer-events-none" />
         <div className="pointer-events-none absolute -top-32 left-1/2 -translate-x-1/2 w-[700px] h-[400px] bg-primary/15 blur-3xl rounded-full" />
 
-        <div className="container relative mx-auto max-w-6xl px-4 md:px-6 pt-14 md:pt-20 pb-16 text-center">
+        <div className="container relative mx-auto max-w-7xl px-4 md:px-6 pt-14 md:pt-20 pb-16 text-center">
           <div className="inline-flex items-center gap-2 text-xs font-medium text-primary bg-primary/10 border border-primary/20 px-4 py-1.5 rounded-full mb-8">
             <Sparkles className="w-3.5 h-3.5" />
             17 AI models · 3 free providers · one studio
@@ -267,7 +318,7 @@ export default function LandingPage() {
           {/* Stats row */}
           <div className="mt-12 grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-2xl mx-auto">
             {STATS.map((s) => (
-              <div key={s.label} className="rounded-2xl border border-border/60 bg-card/60 py-4">
+              <div key={s.label} className="rounded-2xl border panel-warm bg-card/60 py-4">
                 <p className="font-headline text-3xl font-bold text-primary">{s.value}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
               </div>
@@ -289,7 +340,7 @@ export default function LandingPage() {
       </section>
 
       {/* ─── Features: bento grid ────────────────────────────── */}
-      <section id="features" className="container mx-auto max-w-6xl px-4 md:px-6 py-20 md:py-28">
+      <section id="features" className="container mx-auto max-w-7xl px-4 md:px-6 py-20 md:py-28">
         <div className="text-center max-w-2xl mx-auto mb-14">
           <h2 className="font-headline text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight">
             A complete studio,<br />not just a prompt box
@@ -312,7 +363,7 @@ export default function LandingPage() {
           </div>
 
           {/* Small card */}
-          <div className="card-hover rounded-3xl border border-border bg-card p-8">
+          <div className="card-hover rounded-3xl border panel-warm bg-card p-8">
             <div className="w-12 h-12 rounded-2xl bg-primary/15 border border-primary/25 flex items-center justify-center mb-5">
               <Film className="w-6 h-6 text-primary" />
             </div>
@@ -324,7 +375,7 @@ export default function LandingPage() {
           </div>
 
           {/* Small card */}
-          <div className="card-hover rounded-3xl border border-border bg-card p-8">
+          <div className="card-hover rounded-3xl border panel-warm bg-card p-8">
             <div className="w-12 h-12 rounded-2xl bg-primary/15 border border-primary/25 flex items-center justify-center mb-5">
               <FileText className="w-6 h-6 text-primary" />
             </div>
@@ -367,7 +418,7 @@ export default function LandingPage() {
               body: "Verified emails only, no fake accounts. Your account is created automatically on first sign-in.",
             },
           ].map((f) => (
-            <div key={f.title} className="card-hover rounded-3xl border border-border bg-card p-8">
+            <div key={f.title} className="card-hover rounded-3xl border panel-warm bg-card p-8">
               <div className="w-12 h-12 rounded-2xl bg-primary/15 border border-primary/25 flex items-center justify-center mb-5">
                 <f.icon className="w-6 h-6 text-primary" />
               </div>
@@ -425,7 +476,7 @@ export default function LandingPage() {
       </section>
 
       {/* ─── Models: provider columns ────────────────────────── */}
-      <section id="models" className="container mx-auto max-w-6xl px-4 md:px-6 py-20 md:py-28">
+      <section id="models" className="container mx-auto max-w-7xl px-4 md:px-6 py-20 md:py-28">
         <div className="text-center max-w-2xl mx-auto mb-14">
           <div className="inline-flex items-center gap-2 text-xs font-medium text-primary bg-primary/10 border border-primary/20 px-4 py-1.5 rounded-full mb-5">
             <Cpu className="w-3.5 h-3.5" /> 13 image models · 4 video models
@@ -444,7 +495,7 @@ export default function LandingPage() {
             const imgs = IMAGE_MODELS.filter((m) => m.provider === prov);
             const vids = VIDEO_MODELS.filter((m) => m.provider === prov);
             return (
-              <div key={prov} className="rounded-3xl border border-border bg-card overflow-hidden">
+              <div key={prov} className="rounded-3xl border panel-warm bg-card overflow-hidden">
                 <div className="px-5 py-4 border-b border-border/60 bg-muted/40 flex items-center gap-2.5">
                   <span className={`w-2.5 h-2.5 rounded-full ${PROVIDER_DOT[prov]}`} />
                   <span className="font-headline font-bold">{prov}</span>
@@ -484,7 +535,7 @@ export default function LandingPage() {
       </section>
 
       {/* ─── Final CTA ───────────────────────────────────────── */}
-      <section className="container mx-auto max-w-6xl px-4 md:px-6 pb-20 md:pb-28">
+      <section className="container mx-auto max-w-7xl px-4 md:px-6 pb-20 md:pb-28">
         <div className="relative overflow-hidden rounded-[2.5rem] border border-primary/25 bg-gradient-to-br from-primary/15 via-card to-accent/15 p-10 md:p-16 text-center">
           <div className="absolute inset-0 bg-dot-grid opacity-40 pointer-events-none" />
           <div className="pointer-events-none absolute -top-20 left-1/2 -translate-x-1/2 w-96 h-96 bg-primary/25 blur-3xl rounded-full" />
@@ -515,7 +566,7 @@ export default function LandingPage() {
 
       {/* ─── Footer: multi-column ────────────────────────────── */}
       <footer className="border-t border-border/50 bg-muted/20">
-        <div className="container mx-auto max-w-6xl px-4 md:px-6 py-12 grid gap-10 md:grid-cols-[1.5fr,1fr,1fr,1fr]">
+        <div className="container mx-auto max-w-7xl px-4 md:px-6 py-12 grid gap-10 md:grid-cols-[1.5fr,1fr,1fr,1fr]">
           <div>
             <div className="flex items-center gap-2.5 mb-3">
               <Logo size={34} className="rounded-xl" />
@@ -583,7 +634,7 @@ export default function LandingPage() {
         </div>
 
         <div className="border-t border-border/50">
-          <div className="container mx-auto max-w-6xl px-4 md:px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-2">
+          <div className="container mx-auto max-w-7xl px-4 md:px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-2">
             <p className="text-xs text-muted-foreground">
               © 2026 PromptStudio · Built by <span className="text-foreground font-medium">Neel Sahani</span>
             </p>

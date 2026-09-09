@@ -291,6 +291,11 @@
   html {
     scroll-behavior: smooth;
   }
+  /* Decorative blurs/marquees must never create sideways scroll or the
+     phantom side gutters it causes at 100% zoom. */
+  html, body {
+    overflow-x: clip;
+  }
   body {
     @apply bg-background text-foreground;
   }
@@ -314,6 +319,12 @@
   }
   .glass {
     @apply bg-background/80 backdrop-blur-xl;
+  }
+  /* Warm-tinted panel: primary-tinted border + faint diagonal wash so
+     containers read as designed surfaces instead of flat solid boxes. */
+  .panel-warm {
+    border-color: hsl(var(--primary) / 0.2);
+    background-image: linear-gradient(155deg, hsl(var(--primary) / 0.06), transparent 45%);
   }
 }
 

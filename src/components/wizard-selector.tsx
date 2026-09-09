@@ -103,7 +103,7 @@ export function WizardSelector({ onSelect }: WizardSelectorProps) {
           <button
             key={idx}
             type="button"
-            className={`group relative flex flex-col items-center text-center p-4 rounded-xl border border-border/50 bg-card hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 transition-all duration-200 overflow-hidden`}
+            className={`group relative flex flex-col items-center text-center p-4 rounded-xl border panel-warm bg-card hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10 transition-all duration-200 overflow-hidden`}
             onClick={() => onSelect(option)}
           >
             <div className={`absolute inset-0 bg-gradient-to-b ${option.gradient} opacity-0 group-hover:opacity-100 transition-opacity`} />

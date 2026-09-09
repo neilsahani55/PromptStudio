@@ -637,7 +637,7 @@ export default function PromptStudioPage() {
     <div suppressHydrationWarning className="flex flex-col min-h-screen bg-background">
       <AnnouncementBanner />
       <Header />
-      <main className="container mx-auto px-4 py-8 md:py-12 flex-grow w-full max-w-5xl">
+      <main className="container mx-auto px-4 py-8 md:py-12 flex-grow w-full max-w-6xl">
         <section className="relative text-center mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="absolute inset-0 bg-dot-grid opacity-40 pointer-events-none -z-10 rounded-3xl" />
           <h1 className="font-headline text-3xl md:text-4xl font-bold mb-2 tracking-tight leading-[1.1]">
@@ -657,7 +657,7 @@ export default function PromptStudioPage() {
           <WizardSelector onSelect={handleWizardSelect} />
         )}
 
-        <Card className="w-full mx-auto shadow-xl shadow-primary/5 border-border/50 overflow-hidden rounded-2xl">
+        <Card className="w-full mx-auto shadow-xl shadow-primary/10 panel-warm overflow-hidden rounded-2xl">
           <CardContent className="p-0">
             <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
               <TabsList className="grid w-full grid-cols-4 h-12 rounded-none bg-muted/40 p-1 gap-1">
