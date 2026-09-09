@@ -66,6 +66,12 @@ function friendlyError(raw: string): { title: string; hint?: string } {
       hint: "Add your own HF token in Settings → API Keys to generate on your own quota — free tokens at huggingface.co/settings/tokens.",
     };
   }
+  if (/exceeded your current quota|RESOURCE_EXHAUSTED/i.test(t)) {
+    return {
+      title: "This Gemini key's free image quota is used up for today.",
+      hint: "It refreshes daily — or add your own Gemini key in Settings → API Keys (free at aistudio.google.com/apikey).",
+    };
+  }
   if (/daily free allocation|10,000 neurons/i.test(t)) {
     return {
       title: "Cloudflare's free daily quota is used up.",
