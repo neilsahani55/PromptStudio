@@ -1,22 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
+import { getUserKey } from '@/lib/user-keys';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
-
-const NVIDIA_KEY = process.env.NVIDIA_API_KEY;
 
 // Polls NVIDIA's NVCF status endpoint for an in-progress image job. The client
 // calls this repeatedly (every few seconds) so total generation time is not
 // bound by any single request's 60s limit.
 export async function GET(req: NextRequest) {
   const token = req.cookies.get('auth-token')?.value;
-  if (!token || !(await verifyToken(token))) {
+  const auth = token ? await verifyToken(token) : null;
+  if (!auth) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }
 
   const reqId = req.nextUrl.searchParams.get('reqId');
   if (!reqId) return NextResponse.json({ error: 'reqId required' }, { status: 400 });
+  // NVCF jobs are key-scoped: a job started on the user's own key must be
+  // polled with that key too, so mirror the generate route's key preference.
+  const userNvidia = await getUserKey(auth.userId, 'nvidia').catch(() => null);
+  const NVIDIA_KEY = userNvidia?.apiKey || process.env.NVIDIA_API_KEY;
   if (!NVIDIA_KEY) return NextResponse.json({ error: 'NVIDIA key not configured' }, { status: 500 });
 
   const statusUrl = `https://api.nvcf.nvidia.com/v2/nvcf/pexec/status/${reqId}`;

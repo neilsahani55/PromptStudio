@@ -46,30 +46,42 @@ const HF_CREDITS_HINT =
 // longer holds resurface bare platform 504s ("Server Error (504)").
 async function runNvidia(model: MediaModel, prompt: string, ar: string, seed: number, deadline: number, apiKey: string) {
   const { width, height } = dims(ar);
-  const isDistilled = /klein|schnell|turbo/i.test(model.endpoint);
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), Math.max(2_000, deadline - Date.now()));
-  // 'nvcf:<id>' endpoints invoke a raw NVCF function; they accept only
-  // {prompt} (extra fields like width/height error). Both paths share the
-  // same async 202+reqId flow and status endpoint.
-  const nvcfId = model.endpoint.startsWith('nvcf:') ? model.endpoint.slice(5) : null;
-  const url = nvcfId
-    ? `https://api.nvcf.nvidia.com/v2/nvcf/pexec/functions/${nvcfId}`
+  const isDistilled = /klein|schnell|turbo/i.test(model.id);
+  // 'nvcf:<id>[?prompt-only]' endpoints invoke a raw NVCF function; the
+  // marker strips extra fields for models (Cosmos) that reject them. Both
+  // paths share the same async 202+reqId flow and status endpoint.
+  const nvcfMatch = model.endpoint.match(/^nvcf:([\w-]+)(\?prompt-only)?$/);
+  const url = nvcfMatch
+    ? `https://api.nvcf.nvidia.com/v2/nvcf/pexec/functions/${nvcfMatch[1]}`
     : `https://ai.api.nvidia.com/v1/genai/${model.endpoint}`;
-  const payload = nvcfId
+  const payload = nvcfMatch?.[2]
     ? { prompt }
     : { prompt, width, height, steps: isDistilled ? 4 : 28, seed };
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-      'NVCF-POLL-SECONDS': '8',
-    },
-    body: JSON.stringify(payload),
-    signal: controller.signal,
-  }).finally(() => clearTimeout(timer));
+
+  const call = async (key: string) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), Math.max(2_000, deadline - Date.now()));
+    return fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'NVCF-POLL-SECONDS': '8',
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timer));
+  };
+
+  let res = await call(apiKey);
+  // NVIDIA capacity errors are per-key flaky — one retry on the fallback key
+  // (platform requests only; BYOK users stay on their own quota).
+  const fallback = process.env.NVIDIA_API_KEY_FALLBACK;
+  if (!res.ok && res.status !== 202 && res.status !== 402 &&
+      fallback && apiKey === process.env.NVIDIA_API_KEY && deadline - Date.now() > 12_000) {
+    res = await call(fallback);
+  }
 
   if (res.status === 202) {
     const reqId = res.headers.get('NVCF-REQID') || res.headers.get('nvcf-reqid');
@@ -77,7 +89,7 @@ async function runNvidia(model: MediaModel, prompt: string, ar: string, seed: nu
   }
   const text = await res.text();
   if (!res.ok) {
-    return errJson(502, `${model.label} failed`, text.slice(0, 250));
+    return errJson(502, `${model.label} failed`, `[HTTP ${res.status}] ${text.slice(0, 240)}`);
   }
   let data: any;
   try { data = JSON.parse(text); } catch { return errJson(502, 'Invalid response from NVIDIA'); }

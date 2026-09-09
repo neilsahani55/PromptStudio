@@ -190,6 +190,7 @@ export function MediaStudio({
   const [models, setModels] = useState<{ image: StudioModel[]; video: StudioModel[] }>({ image: [], video: [] });
   const [missingProviders, setMissingProviders] = useState<string[]>([]);
   const [hfDepleted, setHfDepleted] = useState(false);
+  const [byok, setByok] = useState<string[]>([]);
   const [credits, setCredits] = useState<CreditsInfo | null>(null);
   const [mode, setMode] = useState<"image" | "video">("image");
   const [selected, setSelected] = useState<Record<"image" | "video", string[]>>({ image: [], video: [] });
@@ -208,6 +209,7 @@ export function MediaStudio({
         setModels({ image: data.image || [], video: data.video || [] });
         setMissingProviders(data.missingProviders || []);
         setHfDepleted(!!data.hfDepleted);
+        setByok(data.byokProviders || []);
         if (data.credits) setCredits(data.credits);
         if (initial) {
           // Sensible defaults: first two image models pre-selected.
@@ -489,6 +491,12 @@ export function MediaStudio({
                   <span className="flex items-center gap-1.5 mt-1 text-[10px] text-muted-foreground">
                     <span className={`w-1.5 h-1.5 rounded-full ${p?.dot || "bg-muted-foreground"}`} />
                     {p?.name || m.provider}
+                    {byok.includes(m.provider) && (
+                      <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold text-primary bg-primary/10 border border-primary/25 px-1 py-px rounded" title="Generates on your own API key">
+                        <KeyRound className="w-2 h-2" />
+                        your key
+                      </span>
+                    )}
                     <span className="ml-auto flex items-center gap-0.5">
                       {eta.slow ? <Clock className="w-2.5 h-2.5" /> : <Zap className="w-2.5 h-2.5" />}
                       {eta.label}

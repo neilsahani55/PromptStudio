@@ -74,6 +74,7 @@ export async function GET(req: NextRequest) {
     video: available.filter((m) => m.kind === 'video'),
     missingProviders,
     hfDepleted,
+    byokProviders: Array.from(userProviders),
     credits: {
       total: DAILY_CREDITS,
       used,

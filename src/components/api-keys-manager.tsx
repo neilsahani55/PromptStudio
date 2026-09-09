@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { KeyRound, Loader2, Trash2, CheckCircle2, Plus, PlugZap } from "lucide-react";
+import { KeyRound, Loader2, Trash2, CheckCircle2, Plus, PlugZap, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -112,6 +112,16 @@ export function ApiKeysManager() {
     }
   };
 
+  const handleEdit = (p: string) => {
+    setProvider(p);
+    setApiKey("");
+    toast({
+      title: `Editing ${PROVIDER_META[p]?.label || p} key`,
+      description: "Enter the new key below and hit Verify & save — it replaces the stored one.",
+    });
+    document.getElementById("byok-key-input")?.focus();
+  };
+
   const handleDelete = async (p: string) => {
     await fetch(`/api/user-keys?provider=${encodeURIComponent(p)}`, { method: "DELETE", credentials: "same-origin" });
     toast({ title: `${PROVIDER_META[p]?.label || p} key removed` });
@@ -157,6 +167,10 @@ export function ApiKeysManager() {
                     {testing === k.provider ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <PlugZap className="w-3.5 h-3.5" />}
                     Test
                   </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                    onClick={() => handleEdit(k.provider)} title="Replace this key">
+                    <Pencil className="w-3.5 h-3.5" />
+                  </Button>
                   <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                     onClick={() => handleDelete(k.provider)} title="Remove key">
                     <Trash2 className="w-4 h-4" />
@@ -187,7 +201,7 @@ export function ApiKeysManager() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">API key</Label>
-              <Input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={meta.keyHint} className="bg-background" />
+              <Input id="byok-key-input" type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={meta.keyHint} className="bg-background" />
             </div>
             {(meta.needsBaseUrl || provider === "custom" || provider === "ollama") && (
               <div className="space-y-1.5">

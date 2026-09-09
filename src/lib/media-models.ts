@@ -27,26 +27,29 @@ export interface MediaModel {
 
 export const MEDIA_MODELS: MediaModel[] = [
   // ─── Images: NVIDIA ───────────────────────────────────────────
+  // Klein is invoked via the raw NVCF pexec host — ai.api.nvidia.com answers
+  // Vercel egress with empty-body errors while api.nvcf.nvidia.com behaves
+  // (verified Sept 2026 by probing production directly).
   {
     id: 'nvidia-flux-klein',
     label: 'FLUX.2 Klein',
     kind: 'image',
     provider: 'nvidia',
-    endpoint: 'black-forest-labs/flux.2-klein-4b',
+    endpoint: 'nvcf:f67e96d8-1c4e-422e-a913-90f00e19aa9a',
     maxPrompt: 800,
     note: 'Fast · NVIDIA',
   },
   // flux.1-dev REMOVED Sept 9 2026 — NVIDIA's backend function now errors on
   // every call (nvcf-status: errored), same fate as flux.1-schnell in July.
-  // NVCF pexec function (not a genai path) — endpoint is 'nvcf:<function-id>'.
-  // Accepts ONLY {prompt} (width/height cause a 503). Self-scoring multi-pass
-  // model; renders take ~3-4 minutes via the async polling flow.
+  // Cosmos accepts ONLY {prompt} (width/height cause a 503) — the
+  // '?prompt-only' marker tells runNvidia to strip the extras. Self-scoring
+  // multi-pass model; renders take ~3-4 minutes via the async polling flow.
   {
     id: 'nvidia-cosmos3',
     label: 'Cosmos 3 Super',
     kind: 'image',
     provider: 'nvidia',
-    endpoint: 'nvcf:f65a2585-3b67-46ce-a431-af764d93e954',
+    endpoint: 'nvcf:f65a2585-3b67-46ce-a431-af764d93e954?prompt-only',
     maxPrompt: 1500,
     note: 'Newest NVIDIA · slow (~3-4 min)',
   },
