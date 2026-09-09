@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import {
-  Image as ImageIcon, Film, Loader2, Download, Sparkles, Check, Wand2, Cpu,
+  Image as ImageIcon, Film, Loader2, Download, Sparkles, Check, Wand2, Cpu, KeyRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -317,16 +318,35 @@ export function MediaStudio({
 
       {/* Model selection */}
       <div className="space-y-2">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-          Models · {chosen.length}/{MAX_SELECT[mode]} selected
-        </p>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+            Models · {chosen.length}/{MAX_SELECT[mode]} selected
+          </p>
+          <Link
+            href="/settings"
+            className="flex items-center gap-1 text-[11px] text-primary hover:underline shrink-0"
+            title="Bring your own provider keys to generate on your own quota"
+          >
+            <KeyRound className="w-3 h-3" />
+            Use your own API keys
+          </Link>
+        </div>
         {activeModels.length === 0 ? (
           <p className="text-xs text-muted-foreground border border-dashed border-border rounded-lg p-3">
-            {mode === "video"
-              ? hfDepleted
-                ? "Video is paused — the app's free Hugging Face credits are used up this month. Add your own HF token in Settings → API Keys (free at huggingface.co/settings/tokens) to generate video on your own quota."
-                : "No video models configured. Add HF_TOKEN (free at huggingface.co) to unlock LTX-Video and Wan 2.2 — see ENVIRONMENT.md."
-              : "No image models configured. Add NVIDIA_API_KEY — see ENVIRONMENT.md."}
+            {mode === "video" ? (
+              hfDepleted ? (
+                <>
+                  Video is paused — the app&apos;s free Hugging Face credits are used up this month. Add
+                  your own HF token in{" "}
+                  <Link href="/settings" className="text-primary hover:underline">Settings → API Keys</Link>{" "}
+                  (free at huggingface.co/settings/tokens) to generate video on your own quota.
+                </>
+              ) : (
+                "No video models configured. Add HF_TOKEN (free at huggingface.co) to unlock LTX-Video and Wan 2.2 — see ENVIRONMENT.md."
+              )
+            ) : (
+              "No image models configured. Add NVIDIA_API_KEY — see ENVIRONMENT.md."
+            )}
           </p>
         ) : (
           <div className="flex flex-wrap gap-2">
@@ -353,7 +373,9 @@ export function MediaStudio({
         {hfDepleted && activeModels.length > 0 && (
           <p className="text-[11px] text-muted-foreground">
             ⏸ Hugging Face models are hidden — the app's free monthly credits are used up. Add your
-            own HF token in Settings → API Keys to bring them back on your own quota.
+            own HF token in{" "}
+            <Link href="/settings" className="text-primary hover:underline">Settings → API Keys</Link>{" "}
+            to bring them back on your own quota.
           </p>
         )}
         {missingProviders.length > 0 && (

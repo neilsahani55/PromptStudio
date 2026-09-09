@@ -36,15 +36,8 @@ export const MEDIA_MODELS: MediaModel[] = [
     maxPrompt: 800,
     note: 'Fast · NVIDIA',
   },
-  {
-    id: 'nvidia-flux-dev',
-    label: 'FLUX.1 Dev',
-    kind: 'image',
-    provider: 'nvidia',
-    endpoint: 'black-forest-labs/flux.1-dev',
-    maxPrompt: 1500,
-    note: 'High quality · NVIDIA',
-  },
+  // flux.1-dev REMOVED Sept 9 2026 — NVIDIA's backend function now errors on
+  // every call (nvcf-status: errored), same fate as flux.1-schnell in July.
   // NVCF pexec function (not a genai path) — endpoint is 'nvcf:<function-id>'.
   // Accepts ONLY {prompt} (width/height cause a 503). Self-scoring multi-pass
   // model; renders take ~3-4 minutes via the async polling flow.
