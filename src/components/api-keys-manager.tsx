@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { KeyRound, Loader2, Trash2, CheckCircle2, Plus } from "lucide-react";
+import { KeyRound, Loader2, Trash2, CheckCircle2, Plus, PlugZap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -90,6 +90,28 @@ export function ApiKeysManager() {
     }
   };
 
+  const [testing, setTesting] = useState<string | null>(null);
+  const handleTest = async (p: string) => {
+    setTesting(p);
+    const label = PROVIDER_META[p]?.label || p;
+    try {
+      const res = await fetch(`/api/user-keys?provider=${encodeURIComponent(p)}`, {
+        method: "PATCH",
+        credentials: "same-origin",
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        toast({ title: `${label}: connection OK ✓`, description: data.detail });
+      } else {
+        toast({ variant: "destructive", title: `${label}: connection failed`, description: data.detail || data.error });
+      }
+    } catch {
+      toast({ variant: "destructive", title: `${label}: test failed`, description: "Network error — try again." });
+    } finally {
+      setTesting(null);
+    }
+  };
+
   const handleDelete = async (p: string) => {
     await fetch(`/api/user-keys?provider=${encodeURIComponent(p)}`, { method: "DELETE", credentials: "same-origin" });
     toast({ title: `${PROVIDER_META[p]?.label || p} key removed` });
@@ -129,10 +151,17 @@ export function ApiKeysManager() {
                     {k.model ? ` · model: ${k.model}` : ""}
                   </p>
                 </div>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
-                  onClick={() => handleDelete(k.provider)} title="Remove key">
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-primary hover:text-primary hover:bg-primary/10"
+                    onClick={() => handleTest(k.provider)} disabled={testing === k.provider} title="Test the connection with this key">
+                    {testing === k.provider ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <PlugZap className="w-3.5 h-3.5" />}
+                    Test
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => handleDelete(k.provider)} title="Remove key">
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
             ))}
           </div>

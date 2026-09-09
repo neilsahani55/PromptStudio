@@ -144,7 +144,21 @@ export async function validateProviderKey(
         const r = await fetch('https://huggingface.co/api/whoami-v2', { headers: bearer, signal: timeout(15000) });
         if (!r.ok) return { ok: false, detail: `Hugging Face rejected the token (HTTP ${r.status}).` };
         const who: any = await r.json();
-        return { ok: true, detail: `Hugging Face token valid (account: ${who?.name || 'ok'}).` };
+        // Zero-cost credit check: the router's billing gate answers 402 before
+        // request validation, so an empty body never triggers a generation.
+        const probe = await fetch('https://router.huggingface.co/fal-ai/fal-ai/flux/schnell', {
+          method: 'POST',
+          headers: { ...bearer, 'Content-Type': 'application/json' },
+          body: '{}',
+          signal: timeout(10000),
+        });
+        if (probe.status === 402) {
+          return {
+            ok: true,
+            detail: `Token valid (account: ${who?.name || 'ok'}) — but its inference credits are used up, so generation will fail until they reset or you buy credits / PRO.`,
+          };
+        }
+        return { ok: true, detail: `Hugging Face token valid (account: ${who?.name || 'ok'}) — inference credits available.` };
       }
       case 'nvidia': {
         const r = await fetch('https://integrate.api.nvidia.com/v1/models', { headers: bearer, signal: timeout(15000) });

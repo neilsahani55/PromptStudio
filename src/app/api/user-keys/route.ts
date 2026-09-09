@@ -6,6 +6,7 @@ import {
   listUserKeys,
   saveUserKey,
   deleteUserKey,
+  getUserKey,
   validateProviderKey,
   type KeyProvider,
 } from '@/lib/user-keys';
@@ -57,6 +58,22 @@ export async function POST(req: NextRequest) {
 
   await saveUserKey(auth.userId, provider as KeyProvider, apiKey, baseUrl, model);
   return NextResponse.json({ ok: true, detail: check.detail });
+}
+
+// PATCH ?provider=x → re-run the live connection test for an already-saved key
+export async function PATCH(req: NextRequest) {
+  const auth = await getAuth(req);
+  if (!auth) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  const provider = req.nextUrl.searchParams.get('provider') as KeyProvider | null;
+  if (!provider || !KEY_PROVIDERS.includes(provider)) {
+    return NextResponse.json({ error: 'Unknown provider' }, { status: 400 });
+  }
+  const saved = await getUserKey(auth.userId, provider);
+  if (!saved) {
+    return NextResponse.json({ error: 'No saved key for this provider' }, { status: 404 });
+  }
+  const check = await validateProviderKey(provider, saved.apiKey, saved.baseUrl);
+  return NextResponse.json({ ok: check.ok, detail: check.detail }, { status: check.ok ? 200 : 422 });
 }
 
 // DELETE ?provider=x → remove a saved key
