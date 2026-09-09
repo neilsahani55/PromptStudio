@@ -108,7 +108,10 @@ function friendlyError(raw: string): { title: string; hint?: string } {
 
 // Poll the NVCF status endpoint for NVIDIA async jobs (each poll is its own
 // short request — total time is not bound by any single 60s function).
-async function pollStatus(reqId: string): Promise<{ base64: string | null; url: string | null }> {
+async function pollStatus(
+  reqId: string,
+  onStage: (stage: string) => void
+): Promise<{ base64: string | null; url: string | null }> {
   const deadline = Date.now() + 360_000;
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 2500));
@@ -118,7 +121,10 @@ async function pollStatus(reqId: string): Promise<{ base64: string | null; url: 
     } catch { continue; }
     let data: any = null;
     try { data = JSON.parse(await res.text()); } catch { continue; }
-    if (data?.pending) continue;
+    if (data?.pending) {
+      onStage(data.note === "provider busy" ? "NVIDIA is busy — still trying…" : "Rendering…");
+      continue;
+    }
     if (!res.ok || data?.error) {
       throw new Error([data?.error || "Generation failed", data?.detail].filter(Boolean).join(" — "));
     }
@@ -300,7 +306,7 @@ export function MediaStudio({
       if (res.ok && data?.pending && data?.reqId) {
         // NVIDIA async job
         setStage("Rendering…");
-        const media = await pollStatus(data.reqId);
+        const media = await pollStatus(data.reqId, setStage);
         data = { ...data, media: { base64: media.base64, url: media.url }, kind: "image" };
       } else if (res.ok && data?.pending && data?.falRequestId) {
         // fal video job — polls for up to 8 minutes
