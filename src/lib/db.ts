@@ -183,12 +183,19 @@ async function seedSettings(): Promise<void> {
     announcement_text: '',
     announcement_type: 'info',
   };
-  for (const [key, value] of Object.entries(defaults)) {
-    await client.unsafe(
-      'INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING',
-      [key, value]
-    );
-  }
+  // One multi-row insert — ten sequential round trips on every cold start
+  // were a meaningful slice of the ~10s function budget.
+  const entries = Object.entries(defaults);
+  const values: string[] = [];
+  const params: string[] = [];
+  entries.forEach(([key, value], i) => {
+    values.push(`($${i * 2 + 1}, $${i * 2 + 2})`);
+    params.push(key, value);
+  });
+  await client.unsafe(
+    `INSERT INTO settings (key, value) VALUES ${values.join(', ')} ON CONFLICT (key) DO NOTHING`,
+    params
+  );
 }
 
 async function seedAdmin(): Promise<void> {

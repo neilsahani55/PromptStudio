@@ -117,6 +117,9 @@ export async function validateProviderKey(
   apiKey: string,
   baseUrl?: string | null
 ): Promise<{ ok: boolean; detail: string }> {
+  // Every validation must finish inside the shortest budget Vercel may
+  // enforce on the whole request (~10s observed) — cold-start DB init and the
+  // save itself share that window, so external calls get tight timeouts.
   const timeout = (ms: number) => {
     const c = new AbortController();
     setTimeout(() => c.abort(), ms);
@@ -126,22 +129,22 @@ export async function validateProviderKey(
   try {
     switch (provider) {
       case 'openai': {
-        const r = await fetch('https://api.openai.com/v1/models', { headers: bearer, signal: timeout(15000) });
+        const r = await fetch('https://api.openai.com/v1/models', { headers: bearer, signal: timeout(6000) });
         return r.ok ? { ok: true, detail: 'OpenAI key is valid.' } : { ok: false, detail: `OpenAI rejected the key (HTTP ${r.status}).` };
       }
       case 'gemini': {
         const r = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`,
-          { signal: timeout(15000) }
+          { signal: timeout(6000) }
         );
         return r.ok ? { ok: true, detail: 'Gemini key is valid.' } : { ok: false, detail: `Google rejected the key (HTTP ${r.status}).` };
       }
       case 'deepseek': {
-        const r = await fetch('https://api.deepseek.com/models', { headers: bearer, signal: timeout(15000) });
+        const r = await fetch('https://api.deepseek.com/models', { headers: bearer, signal: timeout(6000) });
         return r.ok ? { ok: true, detail: 'DeepSeek key is valid.' } : { ok: false, detail: `DeepSeek rejected the key (HTTP ${r.status}).` };
       }
       case 'huggingface': {
-        const r = await fetch('https://huggingface.co/api/whoami-v2', { headers: bearer, signal: timeout(15000) });
+        const r = await fetch('https://huggingface.co/api/whoami-v2', { headers: bearer, signal: timeout(4000) });
         if (!r.ok) return { ok: false, detail: `Hugging Face rejected the token (HTTP ${r.status}).` };
         const who: any = await r.json();
         // Zero-cost credit check: the router's billing gate answers 402 before
@@ -150,7 +153,7 @@ export async function validateProviderKey(
           method: 'POST',
           headers: { ...bearer, 'Content-Type': 'application/json' },
           body: '{}',
-          signal: timeout(10000),
+          signal: timeout(4000),
         });
         if (probe.status === 402) {
           return {
@@ -161,17 +164,17 @@ export async function validateProviderKey(
         return { ok: true, detail: `Hugging Face token valid (account: ${who?.name || 'ok'}) — inference credits available.` };
       }
       case 'nvidia': {
-        const r = await fetch('https://integrate.api.nvidia.com/v1/models', { headers: bearer, signal: timeout(15000) });
+        const r = await fetch('https://integrate.api.nvidia.com/v1/models', { headers: bearer, signal: timeout(6000) });
         return r.ok ? { ok: true, detail: 'NVIDIA key is valid.' } : { ok: false, detail: `NVIDIA rejected the key (HTTP ${r.status}).` };
       }
       case 'ollama': {
         if (!baseUrl) return { ok: false, detail: 'Ollama needs a Base URL (a publicly reachable server, e.g. https://my-ollama.example.com).' };
-        const r = await fetch(`${baseUrl.replace(/\/$/, '')}/api/tags`, { signal: timeout(15000) });
+        const r = await fetch(`${baseUrl.replace(/\/$/, '')}/api/tags`, { signal: timeout(6000) });
         return r.ok ? { ok: true, detail: 'Ollama server reachable.' } : { ok: false, detail: `Ollama server responded HTTP ${r.status}.` };
       }
       case 'custom': {
         if (!baseUrl) return { ok: false, detail: 'Custom provider needs a Base URL (OpenAI-compatible, e.g. https://api.example.com/v1).' };
-        const r = await fetch(`${baseUrl.replace(/\/$/, '')}/models`, { headers: bearer, signal: timeout(15000) });
+        const r = await fetch(`${baseUrl.replace(/\/$/, '')}/models`, { headers: bearer, signal: timeout(6000) });
         return r.ok ? { ok: true, detail: 'Custom endpoint reachable and key accepted.' } : { ok: false, detail: `Endpoint responded HTTP ${r.status}.` };
       }
     }
