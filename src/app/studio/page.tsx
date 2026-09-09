@@ -78,6 +78,10 @@ const ResultsDisplay = dynamic(() =>
   import("@/components/results-display").then((m) => m.ResultsDisplay),
   { ssr: false }
 );
+const MediaStudio = dynamic(() =>
+  import("@/components/media-studio").then((m) => m.MediaStudio),
+  { ssr: false }
+);
 
 const SCREENSHOT_PRESETS = [
   {
@@ -274,10 +278,11 @@ export default function PromptStudioPage() {
         }
       }
 
-      // Cmd/Ctrl + 1/2/3 → Switch tabs
+      // Cmd/Ctrl + 1/2/3/4 → Switch tabs
       if (isMod && e.key === '1') { e.preventDefault(); setActiveTab('text'); }
-      if (isMod && e.key === '2') { e.preventDefault(); setActiveTab('screenshot'); }
-      if (isMod && e.key === '3') { e.preventDefault(); setActiveTab('history'); }
+      if (isMod && e.key === '2') { e.preventDefault(); setActiveTab('generate'); }
+      if (isMod && e.key === '3') { e.preventDefault(); setActiveTab('screenshot'); }
+      if (isMod && e.key === '4') { e.preventDefault(); setActiveTab('history'); }
     };
 
     window.addEventListener('keydown', handler);
@@ -500,8 +505,10 @@ export default function PromptStudioPage() {
   const handleTabChange = (value: string) => {
     const previousTab = activeTab;
     setActiveTab(value);
-    // Don't clear result when switching to/from history tab
-    if (value !== 'history' && previousTab !== 'history') {
+    // Only clear work when actually switching between the two creation flows —
+    // visiting Generate or History must never wipe the user's results.
+    const nonDestructive = ['history', 'generate'];
+    if (!nonDestructive.includes(value) && !nonDestructive.includes(previousTab)) {
       setResult(null);
       setUploadedImagePreview(null);
       form.reset();
@@ -631,20 +638,17 @@ export default function PromptStudioPage() {
       <AnnouncementBanner />
       <Header />
       <main className="container mx-auto px-4 py-8 md:py-12 flex-grow w-full max-w-5xl">
-        <section className="relative text-center mb-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <section className="relative text-center mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="absolute inset-0 bg-dot-grid opacity-40 pointer-events-none -z-10 rounded-3xl" />
-          <div className="inline-flex items-center justify-center gap-2 px-4 py-1.5 mb-5 rounded-full bg-primary/10 text-primary border border-primary/20">
-            <Sparkles className="w-4 h-4" />
-            <span className="text-sm font-medium">AI-Powered Prompt Generator</span>
-          </div>
-          <h1 className="font-headline text-4xl md:text-5xl lg:text-6xl font-bold mb-4 tracking-tight leading-[1.1]">
+          <h1 className="font-headline text-3xl md:text-4xl font-bold mb-2 tracking-tight leading-[1.1]">
             <span className="text-foreground">Turn Any Content into </span>
             <span className="bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
               Stunning Visuals
             </span>
           </h1>
-          <p className="text-base md:text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed">
-            Generate optimized image prompts for Midjourney, DALL-E, Stable Diffusion, and Flux from your text or screenshots.
+          <p className="text-sm md:text-base text-muted-foreground max-w-xl mx-auto leading-relaxed">
+            Write an idea or drop a screenshot — get optimized prompts, then generate images and video
+            on multiple AI models at once.
           </p>
         </section>
 
@@ -656,20 +660,30 @@ export default function PromptStudioPage() {
         <Card className="w-full mx-auto shadow-xl shadow-primary/5 border-border/50 overflow-hidden rounded-2xl">
           <CardContent className="p-0">
             <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-              <TabsList className="grid w-full grid-cols-3 h-12 rounded-none bg-muted/40 p-1 gap-1">
+              <TabsList className="grid w-full grid-cols-4 h-12 rounded-none bg-muted/40 p-1 gap-1">
                 <TabsTrigger
                   value="text"
                   className="data-[state=active]:bg-background data-[state=active]:shadow-md rounded-lg h-full transition-all flex items-center justify-center gap-2 text-sm font-medium"
                 >
                   <FileText className="w-4 h-4" />
-                  From Text
+                  <span className="hidden sm:inline">From Text</span>
+                  <span className="sm:hidden">Text</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="generate"
+                  className="data-[state=active]:bg-background data-[state=active]:shadow-md rounded-lg h-full transition-all flex items-center justify-center gap-2 text-sm font-medium"
+                >
+                  <Wand2 className="w-4 h-4" />
+                  <span className="hidden sm:inline">Image &amp; Video</span>
+                  <span className="sm:hidden">Generate</span>
                 </TabsTrigger>
                 <TabsTrigger
                   value="screenshot"
                   className="data-[state=active]:bg-background data-[state=active]:shadow-md rounded-lg h-full transition-all flex items-center justify-center gap-2 text-sm font-medium"
                 >
                   <ImageIcon className="w-4 h-4" />
-                  From Screenshot
+                  <span className="hidden sm:inline">From Screenshot</span>
+                  <span className="sm:hidden">Screenshot</span>
                 </TabsTrigger>
                 <TabsTrigger
                   value="history"
@@ -1031,6 +1045,18 @@ export default function PromptStudioPage() {
                       )}
                     </form>
                   </Form>
+                </TabsContent>
+                <TabsContent value="generate" className="mt-0 animate-in fade-in duration-300">
+                  <div className="mb-5">
+                    <h2 className="text-lg font-bold flex items-center gap-2">
+                      <Wand2 className="w-5 h-5 text-primary" />
+                      Generate images &amp; video
+                    </h2>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      Type a prompt, run it on several AI models at once, keep the best result.
+                    </p>
+                  </div>
+                  <MediaStudio masterPrompt="" aspectRatio="16:9" standalone />
                 </TabsContent>
                 <TabsContent value="screenshot" className="mt-0 animate-in fade-in duration-300">
                   {/* Screenshot Mode Selection */}
