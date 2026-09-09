@@ -183,6 +183,85 @@ export async function validateProviderKey(
   }
 }
 
+// ─── Model catalog per key (for the Settings model dropdown) ────────────────
+// Lists the models an LLM key can actually access, so users pick from their
+// own catalog instead of typing ids blind. Same 6s budget as validation.
+const NOISE = /embed|whisper|tts|audio|dall-e|image|moderation|realtime|transcribe|davinci|babbage|curie|(^|-)ada/i;
+
+export async function listProviderModels(
+  provider: KeyProvider,
+  apiKey: string,
+  baseUrl?: string | null
+): Promise<{ ok: boolean; models?: string[]; detail?: string }> {
+  const timeout = (ms: number) => {
+    const c = new AbortController();
+    setTimeout(() => c.abort(), ms);
+    return c.signal;
+  };
+  const bearer = { Authorization: `Bearer ${apiKey}` };
+  const done = (models: string[]) => ({
+    ok: true,
+    models: Array.from(new Set(models)).slice(0, 100),
+  });
+  try {
+    switch (provider) {
+      case 'openai': {
+        const r = await fetch('https://api.openai.com/v1/models', { headers: bearer, signal: timeout(6000) });
+        if (!r.ok) return { ok: false, detail: `OpenAI rejected the key (HTTP ${r.status}).` };
+        const d: any = await r.json();
+        return done(
+          (d.data || [])
+            .map((m: any) => String(m.id))
+            .filter((id: string) => !NOISE.test(id))
+            .sort()
+        );
+      }
+      case 'gemini': {
+        const r = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}&pageSize=200`,
+          { signal: timeout(6000) }
+        );
+        if (!r.ok) return { ok: false, detail: `Google rejected the key (HTTP ${r.status}).` };
+        const d: any = await r.json();
+        return done(
+          (d.models || [])
+            .filter((m: any) => (m.supportedGenerationMethods || []).includes('generateContent'))
+            .map((m: any) => String(m.name).replace(/^models\//, ''))
+            .sort()
+        );
+      }
+      case 'deepseek': {
+        const r = await fetch('https://api.deepseek.com/models', { headers: bearer, signal: timeout(6000) });
+        if (!r.ok) return { ok: false, detail: `DeepSeek rejected the key (HTTP ${r.status}).` };
+        const d: any = await r.json();
+        return done((d.data || []).map((m: any) => String(m.id)).sort());
+      }
+      case 'ollama': {
+        if (!baseUrl) return { ok: false, detail: 'Ollama needs a Base URL first.' };
+        const r = await fetch(`${baseUrl.replace(/\/$/, '')}/api/tags`, { signal: timeout(6000) });
+        if (!r.ok) return { ok: false, detail: `Ollama server responded HTTP ${r.status}.` };
+        const d: any = await r.json();
+        return done((d.models || []).map((m: any) => String(m.name)).sort());
+      }
+      case 'custom': {
+        if (!baseUrl) return { ok: false, detail: 'Custom provider needs a Base URL first.' };
+        const r = await fetch(`${baseUrl.replace(/\/$/, '')}/models`, { headers: bearer, signal: timeout(6000) });
+        if (!r.ok) return { ok: false, detail: `Endpoint responded HTTP ${r.status}.` };
+        const d: any = await r.json();
+        const arr = Array.isArray(d) ? d : d.data || d.models || [];
+        return done(arr.map((m: any) => String(m.id ?? m.name ?? m)).sort());
+      }
+      default:
+        return { ok: false, detail: 'This provider has no selectable model list.' };
+    }
+  } catch (e) {
+    return {
+      ok: false,
+      detail: `Could not reach the provider: ${e instanceof Error ? e.message.slice(0, 80) : 'network error'}`,
+    };
+  }
+}
+
 // ─── BYOK LLM completion (Enhance / video-prompt features) ──────────────────
 // Tries the user's configured LLM providers in preference order and returns
 // the first successful completion, or null if none are configured/working.

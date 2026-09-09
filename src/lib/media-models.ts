@@ -13,7 +13,7 @@
  */
 
 export type MediaKind = 'image' | 'video';
-export type MediaProvider = 'nvidia' | 'cloudflare' | 'hf';
+export type MediaProvider = 'nvidia' | 'cloudflare' | 'hf' | 'gemini';
 
 export interface MediaModel {
   id: string; // registry id used by the API
@@ -52,6 +52,18 @@ export const MEDIA_MODELS: MediaModel[] = [
     endpoint: 'nvcf:f65a2585-3b67-46ce-a431-af764d93e954?prompt-only',
     maxPrompt: 1500,
     note: 'Newest NVIDIA · slow (~3-4 min)',
+  },
+  // ─── Images: Google Gemini (Nano Banana) ─────────────────────
+  // Uses the platform GOOGLE_GENAI_API_KEY or the user's own Gemini key
+  // (BYOK) — free-tier image quota is small and daily, so BYOK matters here.
+  {
+    id: 'gemini-flash-image',
+    label: 'Nano Banana',
+    kind: 'image',
+    provider: 'gemini',
+    endpoint: 'gemini-2.5-flash-image',
+    maxPrompt: 2000,
+    note: 'Gemini image · Google',
   },
   // ─── Images: Cloudflare Workers AI (free daily allocation) ────
   // flux-2-* endpoints require multipart/form-data input (verified Sept 2026);
@@ -211,6 +223,8 @@ export function providerConfigured(p: MediaProvider): boolean {
       return !!process.env.CLOUDFLARE_ACCOUNT_ID && !!process.env.CLOUDFLARE_API_TOKEN;
     case 'hf':
       return !!process.env.HF_TOKEN;
+    case 'gemini':
+      return !!process.env.GOOGLE_GENAI_API_KEY;
   }
 }
 

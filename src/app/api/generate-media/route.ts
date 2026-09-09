@@ -154,6 +154,49 @@ async function runCloudflare(model: MediaModel, prompt: string, deadline: number
   return okJson({ modelId: model.id, kind: 'image', media: { base64: `data:${mime};base64,${buf.toString('base64')}`, url: null } });
 }
 
+// ─── Google Gemini (Nano Banana) ────────────────────────────────────────────
+// Synchronous generateContent call — typically 4-10s. Free-tier image quota
+// is tiny and daily, so BYOK keys matter most here.
+async function runGemini(model: MediaModel, prompt: string, ar: string, deadline: number, apiKey: string) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), Math.max(2_000, deadline - Date.now()));
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model.endpoint}:generateContent?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { imageConfig: { aspectRatio: ar } },
+      }),
+      signal: controller.signal,
+    }
+  ).finally(() => clearTimeout(timer));
+
+  const text = await res.text();
+  if (!res.ok) {
+    const hint = res.status === 429
+      ? "This Gemini key's free daily image quota is used up — it refreshes daily. Add your own Gemini key in Settings → API Keys (free at aistudio.google.com/apikey) to use your own quota."
+      : undefined;
+    return errJson(502, `${model.label} failed`, `[HTTP ${res.status}] ${text.slice(0, 240)}`, hint);
+  }
+  let data: any;
+  try { data = JSON.parse(text); } catch { return errJson(502, 'Invalid response from Google'); }
+  const parts: any[] = data?.candidates?.[0]?.content?.parts || [];
+  const img = parts.find((p) => p?.inlineData?.data);
+  if (!img) {
+    const refusal = parts.find((p) => typeof p?.text === 'string')?.text;
+    return errJson(502, 'No image returned from model', refusal ? refusal.slice(0, 200) : undefined,
+      refusal ? 'The model declined this prompt — try rephrasing it.' : undefined);
+  }
+  const mime = img.inlineData.mimeType || 'image/png';
+  return okJson({
+    modelId: model.id,
+    kind: 'image',
+    media: { base64: `data:${mime};base64,${img.inlineData.data}`, url: null },
+  });
+}
+
 // ─── Hugging Face router ────────────────────────────────────────────────────
 // Images: fal's sync route (verified Sept 2026 — Together's image routes are
 // dead: models delisted / third-party data sharing blocked).
@@ -230,12 +273,15 @@ export async function POST(req: NextRequest) {
     // and takes precedence so generation runs on their own quota.
     const userHf = model.provider === 'hf' ? await getUserKey(auth.userId, 'huggingface') : null;
     const userNvidia = model.provider === 'nvidia' ? await getUserKey(auth.userId, 'nvidia') : null;
+    const userGemini = model.provider === 'gemini' ? await getUserKey(auth.userId, 'gemini') : null;
     const hfToken = userHf?.apiKey || process.env.HF_TOKEN || '';
     const nvidiaKey = userNvidia?.apiKey || process.env.NVIDIA_API_KEY || '';
+    const geminiKey = userGemini?.apiKey || process.env.GOOGLE_GENAI_API_KEY || '';
 
     const usable =
       (model.provider === 'hf' && !!hfToken) ||
       (model.provider === 'nvidia' && !!nvidiaKey) ||
+      (model.provider === 'gemini' && !!geminiKey) ||
       (model.provider === 'cloudflare' && providerConfigured('cloudflare'));
     if (!usable) {
       return errJson(501, `${model.label} is not configured`, undefined,
@@ -272,6 +318,9 @@ export async function POST(req: NextRequest) {
         break;
       case 'hf':
         res = await runHf(model, prompt, aspectRatio, deadline, hfToken);
+        break;
+      case 'gemini':
+        res = await runGemini(model, prompt, aspectRatio, deadline, geminiKey);
         break;
     }
     // Provider failed — the user shouldn't lose a credit for it.

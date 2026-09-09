@@ -48,7 +48,12 @@ export async function GET(req: NextRequest) {
   const userKeys = await listUserKeys(auth.userId);
   const userProviders = new Set(
     userKeys
-      .map((k) => (k.provider === 'huggingface' ? 'hf' : k.provider === 'nvidia' ? 'nvidia' : null))
+      .map((k) =>
+        k.provider === 'huggingface' ? 'hf'
+        : k.provider === 'nvidia' ? 'nvidia'
+        : k.provider === 'gemini' ? 'gemini'
+        : null
+      )
       .filter(Boolean) as string[]
   );
 

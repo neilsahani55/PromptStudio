@@ -29,11 +29,13 @@ const PROVIDER_DOT: Record<string, string> = {
   NVIDIA: "bg-[#76B900]",
   Cloudflare: "bg-[#F6821F]",
   "Hugging Face": "bg-[#FFD21E]",
+  Google: "bg-[#4285F4]",
 };
 
 const IMAGE_MODELS = [
   { name: "FLUX.2 Klein", provider: "NVIDIA", tag: "Fast" },
   { name: "Cosmos 3 Super", provider: "NVIDIA", tag: "Newest" },
+  { name: "Nano Banana", provider: "Google", tag: "Gemini image" },
   { name: "FLUX.2 Klein 4B", provider: "Cloudflare", tag: "New" },
   { name: "FLUX.2 Klein 9B", provider: "Cloudflare", tag: "Quality" },
   { name: "Leonardo Phoenix", provider: "Cloudflare", tag: "Vivid" },
@@ -55,9 +57,9 @@ const VIDEO_MODELS = [
 ];
 
 const STATS = [
-  { value: "13", label: "image models" },
+  { value: "14", label: "image models" },
   { value: "4", label: "video models" },
-  { value: "3", label: "free providers" },
+  { value: "4", label: "free providers" },
   { value: "10", label: "daily credits" },
 ];
 
@@ -292,7 +294,7 @@ export default function LandingPage() {
         <div className="container relative mx-auto max-w-7xl px-4 md:px-6 pt-14 md:pt-20 pb-16 text-center">
           <div className="inline-flex items-center gap-2 text-xs font-medium text-primary bg-primary/10 border border-primary/20 px-4 py-1.5 rounded-full mb-8">
             <Sparkles className="w-3.5 h-3.5" />
-            17 AI models · 3 free providers · one studio
+            18 AI models · 4 free providers · one studio
           </div>
 
           <h1 className="font-headline text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.02] max-w-4xl mx-auto">
@@ -487,7 +489,7 @@ export default function LandingPage() {
       <section id="models" className="container mx-auto max-w-7xl px-4 md:px-6 py-20 md:py-28">
         <div className="text-center max-w-2xl mx-auto mb-14">
           <div className="inline-flex items-center gap-2 text-xs font-medium text-primary bg-primary/10 border border-primary/20 px-4 py-1.5 rounded-full mb-5">
-            <Cpu className="w-3.5 h-3.5" /> 13 image models · 4 video models
+            <Cpu className="w-3.5 h-3.5" /> 14 image models · 4 video models
           </div>
           <h2 className="font-headline text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight">
             A real multi-model fleet
@@ -498,12 +500,16 @@ export default function LandingPage() {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-5">
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5">
           {(
             [
               {
                 prov: "NVIDIA" as const,
                 blurb: "Hosted free on build.nvidia.com — the fastest renders in the fleet, including the brand-new Cosmos 3 Super.",
+              },
+              {
+                prov: "Google" as const,
+                blurb: "Gemini's Nano Banana image model — great at following instructions. Runs on the app key or your own free Gemini key.",
               },
               {
                 prov: "Cloudflare" as const,

@@ -47,6 +47,7 @@ const PROVIDER_STYLE: Record<string, { dot: string; name: string }> = {
   nvidia: { dot: "bg-[#76B900]", name: "NVIDIA" },
   cloudflare: { dot: "bg-[#F6821F]", name: "Cloudflare" },
   hf: { dot: "bg-[#FFD21E]", name: "Hugging Face" },
+  gemini: { dot: "bg-[#4285F4]", name: "Google" },
 };
 
 // Rough per-model expectations shown while loading (and on the card).

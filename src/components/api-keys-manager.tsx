@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { KeyRound, Loader2, Trash2, CheckCircle2, Plus, PlugZap, Pencil } from "lucide-react";
+import { KeyRound, Loader2, Trash2, CheckCircle2, Plus, PlugZap, Pencil, ListChecks } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,7 +22,7 @@ interface SavedKey {
 const PROVIDER_META: Record<string, { label: string; keyHint: string; needsBaseUrl?: boolean; baseUrlHint?: string; modelHint?: string; usedFor: string }> = {
   huggingface: { label: "Hugging Face", keyHint: "hf_… token (huggingface.co/settings/tokens, Inference preset)", usedFor: "Image + video generation on your own HF quota" },
   nvidia: { label: "NVIDIA", keyHint: "nvapi-… key (build.nvidia.com)", usedFor: "FLUX image generation on your own NVIDIA quota" },
-  gemini: { label: "Google Gemini", keyHint: "AIza… key (aistudio.google.com/apikey)", modelHint: "default: gemini-2.5-flash", usedFor: "Prompt Enhance + video-prompt adaptation" },
+  gemini: { label: "Google Gemini", keyHint: "AIza… key (aistudio.google.com/apikey)", modelHint: "default: gemini-2.5-flash", usedFor: "Nano Banana image generation + Prompt Enhance, on your own quota" },
   openai: { label: "OpenAI", keyHint: "sk-… key (platform.openai.com)", modelHint: "default: gpt-4o-mini", usedFor: "Prompt Enhance + video-prompt adaptation" },
   deepseek: { label: "DeepSeek", keyHint: "sk-… key (platform.deepseek.com)", modelHint: "default: deepseek-chat", usedFor: "Prompt Enhance + video-prompt adaptation" },
   ollama: { label: "Ollama", keyHint: "any value (Ollama has no key)", needsBaseUrl: true, baseUrlHint: "publicly reachable server, e.g. https://my-ollama.example.com", modelHint: "e.g. llama3.1", usedFor: "Prompt Enhance via your own Ollama server" },
@@ -40,6 +40,35 @@ export function ApiKeysManager() {
   const [baseUrl, setBaseUrl] = useState("");
   const [model, setModel] = useState("");
   const [saving, setSaving] = useState(false);
+  const [modelOptions, setModelOptions] = useState<string[]>([]);
+  const [loadingModels, setLoadingModels] = useState(false);
+
+  const loadModels = async () => {
+    setLoadingModels(true);
+    try {
+      const res = await fetch("/api/user-keys/models", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          provider,
+          apiKey: apiKey.trim() || undefined,
+          baseUrl: baseUrl.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.models?.length) {
+        setModelOptions(data.models);
+        toast({ title: `${data.models.length} models found ✓`, description: "Pick one from the dropdown — or leave the default." });
+      } else {
+        toast({ variant: "destructive", title: "Could not list models", description: data.detail || data.error || "Try again." });
+      }
+    } catch {
+      toast({ variant: "destructive", title: "Could not list models", description: "Network error — try again." });
+    } finally {
+      setLoadingModels(false);
+    }
+  };
 
   const load = useCallback(async () => {
     try {
@@ -189,7 +218,7 @@ export function ApiKeysManager() {
           <div className="grid sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">Provider</Label>
-              <Select value={provider} onValueChange={setProvider}>
+              <Select value={provider} onValueChange={(v) => { setProvider(v); setModelOptions([]); setModel(""); }}>
                 <SelectTrigger className="bg-background"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {(providers.length ? providers : Object.keys(PROVIDER_META)).map((p) => (
@@ -211,8 +240,39 @@ export function ApiKeysManager() {
             )}
             {meta.modelHint && (
               <div className="space-y-1.5">
-                <Label className="text-xs">Model (optional)</Label>
-                <Input value={model} onChange={(e) => setModel(e.target.value)} placeholder={meta.modelHint} className="bg-background" />
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">Model (optional)</Label>
+                  <button
+                    type="button"
+                    onClick={loadModels}
+                    disabled={loadingModels}
+                    className="flex items-center gap-1 text-[11px] text-primary hover:underline disabled:opacity-50"
+                    title="Fetch every model this key can access and pick from a list"
+                  >
+                    {loadingModels ? <Loader2 className="w-3 h-3 animate-spin" /> : <ListChecks className="w-3 h-3" />}
+                    List my models
+                  </button>
+                </div>
+                {modelOptions.length > 0 ? (
+                  <Select
+                    value={model || "__default"}
+                    onValueChange={(v) => {
+                      if (v === "__manual") { setModelOptions([]); setModel(""); return; }
+                      setModel(v === "__default" ? "" : v);
+                    }}
+                  >
+                    <SelectTrigger className="bg-background"><SelectValue /></SelectTrigger>
+                    <SelectContent className="max-h-64">
+                      <SelectItem value="__default">Provider default ({meta.modelHint.replace("default: ", "")})</SelectItem>
+                      {modelOptions.map((m) => (
+                        <SelectItem key={m} value={m}>{m}</SelectItem>
+                      ))}
+                      <SelectItem value="__manual">— type manually instead —</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input value={model} onChange={(e) => setModel(e.target.value)} placeholder={meta.modelHint} className="bg-background" />
+                )}
               </div>
             )}
           </div>
