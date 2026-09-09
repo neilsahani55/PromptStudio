@@ -23,14 +23,16 @@ export async function GET(req: NextRequest) {
 
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 50_000);
+    // Every poll must fit the shortest budget Vercel may enforce (~10s
+    // observed) — an AbortError below simply reports pending and the client
+    // polls again, so short holds cost nothing but an extra round trip.
+    const timer = setTimeout(() => controller.abort(), 8_500);
     const res = await fetch(statusUrl, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${NVIDIA_KEY}`,
         Accept: 'application/json',
-        // Long-poll NVCF up to 20s per round trip (stays well under our 60s).
-        'NVCF-POLL-SECONDS': '20',
+        'NVCF-POLL-SECONDS': '8',
       },
       signal: controller.signal,
     }).finally(() => clearTimeout(timer));

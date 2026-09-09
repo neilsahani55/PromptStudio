@@ -38,11 +38,12 @@ const errJson = (status: number, error: string, detail?: string, hint?: string) 
 const HF_CREDITS_HINT =
   'The app\'s Hugging Face free credits are used up. Add your OWN Hugging Face token in Settings → API Keys to generate on your own quota (free tokens at huggingface.co/settings/tokens), or buy credits at huggingface.co/settings/billing.';
 
-// ─── NVIDIA (NVCF async: 20s hold, then 202+reqId for client polling) ───────
-// The hold must stay well under Vercel's 60s function cap: with a 45s hold a
-// slow NVIDIA moment pushed the whole invocation past the cap and Vercel
-// answered with its own bare 504. 20s keeps fast models synchronous and flips
-// anything slower to the async polling path the client already handles.
+// ─── NVIDIA (NVCF async: 8s hold, then 202+reqId for client polling) ────────
+// The hold must fit inside the SHORTEST function budget Vercel may enforce
+// (observed ~10s in production despite maxDuration=60): 8s keeps Klein's
+// typical 3-5s render synchronous and flips anything slower to the async
+// polling path the client already handles. Never raise this above ~8s —
+// longer holds resurface bare platform 504s ("Server Error (504)").
 async function runNvidia(model: MediaModel, prompt: string, ar: string, seed: number, deadline: number, apiKey: string) {
   const { width, height } = dims(ar);
   const isDistilled = /klein|schnell|turbo/i.test(model.endpoint);
@@ -64,7 +65,7 @@ async function runNvidia(model: MediaModel, prompt: string, ar: string, seed: nu
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
       Accept: 'application/json',
-      'NVCF-POLL-SECONDS': '20',
+      'NVCF-POLL-SECONDS': '8',
     },
     body: JSON.stringify(payload),
     signal: controller.signal,
